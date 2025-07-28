@@ -8,6 +8,7 @@
 - 🧠 **Whisper转录** - 使用 whisper.cpp 高精度语音识别
 - 🤖 **AI智能纠错** - Gemini 2.5 Flash 自动纠错和标点优化
 - 📋 **剪贴板集成** - 转录结果自动复制到剪贴板
+- 🔔 **智能通知** - 多种通知方式：系统通知、声音提示、视觉反馈
 - 📚 **用户词典** - 自定义词汇权重提升识别准确率
 - ⏱️ **性能监控** - 详细的处理时间统计
 - 🌐 **代理支持** - 支持系统代理访问AI服务
@@ -54,15 +55,27 @@ cp .env.sample .env
 ./setup_env.sh your_gemini_api_key
 ```
 
-### 5. 运行系统
+### 5. 启动应用
 
+#### 方式一：智能启动 (推荐)
 ```bash
+./start.sh
+```
+- 🔍 自动检查系统环境和依赖
+- 📋 显示详细的配置状态  
+- 📖 提供完整的使用指南
+- ⚙️ 检测权限和配置问题
+
+#### 方式二：快速启动
+```bash
+./quick-start.sh
+# 或直接运行
 uv run python main.py
 ```
 
 ## 🎯 使用方法
 
-1. **启动应用** - 运行 `main.py`
+1. **启动应用** - 运行启动脚本
 2. **开始录音** - 双击 Option 键
 3. **停止录音** - 再次双击 Option 键
 4. **获取结果** - 转录完成后自动复制到剪贴板
@@ -85,6 +98,12 @@ WHISPER_LANGUAGE = "zh"          # 识别语言
 ENABLE_GEMINI_CORRECTION = True  # AI纠错
 ENABLE_CLIPBOARD = True          # 剪贴板
 USE_PROXY = True                 # 代理支持
+
+# 通知设置
+ENABLE_NOTIFICATIONS = True       # 通知系统
+ENABLE_SYSTEM_NOTIFICATIONS = True  # 系统通知
+ENABLE_SOUND_NOTIFICATIONS = True   # 声音提示
+ENABLE_VISUAL_NOTIFICATIONS = True  # 视觉反馈
 
 # 调试模式
 DEBUG_MODE = False               # 调试信息

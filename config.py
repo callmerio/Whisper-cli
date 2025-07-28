@@ -52,6 +52,12 @@ HTTPS_PROXY = os.getenv('HTTPS_PROXY', os.getenv('https_proxy', ''))  # HTTPS代
 ENABLE_CLIPBOARD = True  # 启用剪贴板功能
 CLIPBOARD_RAW_FIRST = True  # 先复制原始转录，后覆盖纠错结果
 
+# 通知配置
+ENABLE_NOTIFICATIONS = True  # 启用通知系统
+ENABLE_SYSTEM_NOTIFICATIONS = True  # 启用系统通知（macOS/Linux/Windows）
+ENABLE_SOUND_NOTIFICATIONS = True  # 启用声音提示
+ENABLE_VISUAL_NOTIFICATIONS = True  # 启用视觉提示（控制台闪烁）
+
 # Gemini纠错提示词配置
 GEMINI_CORRECTION_PROMPT = """请对以下中文语音转录文本进行纠错和优化：
 
@@ -67,6 +73,11 @@ GEMINI_CORRECTION_PROMPT = """请对以下中文语音转录文本进行纠错�
 6. 保持自然的口语化表达
 
 只输出纠错后的文本，不要添加任何说明或解释："""
+
+# 录音超时配置
+MAX_RECORDING_DURATION = 7200  # 最大录音时长（秒），默认2小时
+WARNING_RECORDING_DURATION = 6000  # 警告时长（秒），默认100分钟（录音1小时40分钟时提醒）
+TIMEOUT_CHECK_INTERVAL = 60  # 超时检查间隔（秒），每分钟检查一次
 
 # 调试配置
 DEBUG_MODE = True  # 开启调试模式

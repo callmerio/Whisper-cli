@@ -19,6 +19,7 @@ from transcriber import WhisperTranscriber
 from dictionary_manager import DictionaryManager
 from gemini_corrector import GeminiCorrector
 from timer_utils import Timer
+from notification_utils import notification_manager
 import config
 
 class AppState(Enum):
@@ -51,8 +52,19 @@ class VoiceTranscriptionApp:
         # 运行标志
         self.running = False
         
+        # 超时管理
+        self.recording_start_time = None
+        self.timeout_thread = None
+        self.timeout_stop_event = threading.Event()
+        self.warning_shown = False
+        
         clipboard_status = "✅" if config.ENABLE_CLIPBOARD else "❌"
         gemini_status = "✅" if config.ENABLE_GEMINI_CORRECTION and self.gemini_corrector.is_ready else "❌"
+        notification_status = "✅" if config.ENABLE_NOTIFICATIONS else "❌"
+        
+        max_duration_hours = config.MAX_RECORDING_DURATION // 3600
+        max_duration_minutes = (config.MAX_RECORDING_DURATION % 3600) // 60
+        duration_text = f"{max_duration_hours}小时{max_duration_minutes}分钟" if max_duration_hours > 0 else f"{max_duration_minutes}分钟"
         
         print(f"""
 🎤 实时语音转录系统 v1.0
@@ -63,6 +75,8 @@ class VoiceTranscriptionApp:
 词典: {len(self.dictionary_manager.user_dict)} 个词汇
 剪贴板: {clipboard_status}
 Gemini纠错: {gemini_status}
+通知系统: {notification_status}
+最大录音时长: {duration_text}
 ================================
         """)
     
@@ -81,8 +95,10 @@ Gemini纠错: {gemini_status}
         if self.state != AppState.IDLE:
             return
         
+        max_duration_text = self._format_duration(config.MAX_RECORDING_DURATION)
         print(f"\n{'='*50}")
         print(f"🎤 开始录音... (再次双击 Option 键停止)")
+        print(f"⏰ 最大录音时长: {max_duration_text}")
         print(f"{'='*50}")
         
         # 清空之前的数据
@@ -90,6 +106,11 @@ Gemini纠错: {gemini_status}
         self.all_transcript_segments.clear()
         self.final_transcript = None
         self.current_session_audio = None
+        
+        # 重置超时相关状态
+        self.recording_start_time = time.time()
+        self.warning_shown = False
+        self.timeout_stop_event.clear()
         
         # 重置计时器并开始录音计时
         self.timer.reset()
@@ -99,21 +120,33 @@ Gemini纠错: {gemini_status}
         # 更新状态
         self.state = AppState.RECORDING
         
+        # 启动超时检查线程
+        self._start_timeout_monitoring()
+        
         # 开始录音（简化，不用实时处理）
         success = self.audio_recorder.start_recording()
         
-        if not success:
+        if success:
+            # 播放录音开始提示音
+            if config.ENABLE_NOTIFICATIONS:
+                notification_manager.show_start_recording_notification()
+        else:
             print("❌ 录音启动失败")
             self.state = AppState.IDLE
             self.timer.reset()
+            self._stop_timeout_monitoring()
     
-    def _stop_recording(self):
+    def _stop_recording(self, auto_stopped=False):
         """停止录音"""
         if self.state != AppState.RECORDING:
             return
         
+        # 停止超时监控
+        self._stop_timeout_monitoring()
+        
+        stop_reason = "自动停止（超时）" if auto_stopped else "手动停止"
         print(f"\n{'='*50}")
-        print(f"⏹️  停止录音，正在处理...")
+        print(f"⏹️  停止录音，正在处理... ({stop_reason})")
         print(f"{'='*50}")
         
         # 更新状态
@@ -171,13 +204,23 @@ Gemini纠错: {gemini_status}
                     try:
                         pyperclip.copy(raw_text)
                         clipboard_time = self.timer.stop("clipboard_copy")
-                        if clipboard_time:
-                            print(f"📋 原始转录已复制到剪贴板 ({self.timer.format_duration(clipboard_time.duration_ms)})")
+                        
+                        # 使用新的通知系统
+                        if config.ENABLE_NOTIFICATIONS:
+                            notification_manager.show_clipboard_notification(raw_text, "原始")
                         else:
-                            print("📋 原始转录已复制到剪贴板")
+                            # 保留原有的控制台输出
+                            if clipboard_time:
+                                print(f"📋 原始转录已复制到剪贴板 ({self.timer.format_duration(clipboard_time.duration_ms)})")
+                            else:
+                                print("📋 原始转录已复制到剪贴板")
+                                
                     except Exception as e:
                         self.timer.stop("clipboard_copy")
-                        print(f"⚠️  复制到剪贴板失败: {e}")
+                        if config.ENABLE_NOTIFICATIONS:
+                            notification_manager.show_error_notification(f"复制到剪贴板失败: {e}")
+                        else:
+                            print(f"⚠️  复制到剪贴板失败: {e}")
                 
                 # Gemini纠错处理
                 if config.ENABLE_GEMINI_CORRECTION and raw_text:
@@ -206,13 +249,23 @@ Gemini纠错: {gemini_status}
                             try:
                                 pyperclip.copy(corrected_text.strip())
                                 clipboard_update_time = self.timer.stop("clipboard_update")
-                                if gemini_time and clipboard_update_time:
-                                    print(f"✅ Gemini纠错完成 ({self.timer.format_duration(gemini_time.duration_ms)})，已更新剪贴板 ({self.timer.format_duration(clipboard_update_time.duration_ms)})")
+                                
+                                # 使用新的通知系统显示纠错完成
+                                if config.ENABLE_NOTIFICATIONS:
+                                    notification_manager.show_clipboard_notification(corrected_text.strip(), "纠错")
                                 else:
-                                    print("✅ Gemini纠错完成，已更新剪贴板")
+                                    # 保留原有的控制台输出
+                                    if gemini_time and clipboard_update_time:
+                                        print(f"✅ Gemini纠错完成 ({self.timer.format_duration(gemini_time.duration_ms)})，已更新剪贴板 ({self.timer.format_duration(clipboard_update_time.duration_ms)})")
+                                    else:
+                                        print("✅ Gemini纠错完成，已更新剪贴板")
+                                        
                             except Exception as e:
                                 self.timer.stop("clipboard_update")
-                                print(f"⚠️  更新剪贴板失败: {e}")
+                                if config.ENABLE_NOTIFICATIONS:
+                                    notification_manager.show_error_notification(f"更新剪贴板失败: {e}")
+                                else:
+                                    print(f"⚠️  更新剪贴板失败: {e}")
                         else:
                             if gemini_time:
                                 print(f"✅ Gemini纠错完成 ({self.timer.format_duration(gemini_time.duration_ms)})")
@@ -348,6 +401,90 @@ Gemini纠错: {gemini_status}
         }
         return name_map.get(name, name)
     
+    def _format_duration(self, seconds: int) -> str:
+        """格式化时长显示"""
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        secs = seconds % 60
+        
+        if hours > 0:
+            return f"{hours}小时{minutes}分钟{secs}秒"
+        elif minutes > 0:
+            return f"{minutes}分钟{secs}秒"
+        else:
+            return f"{secs}秒"
+    
+    def _start_timeout_monitoring(self):
+        """启动超时监控线程"""
+        if self.timeout_thread is not None and self.timeout_thread.is_alive():
+            return
+        
+        self.timeout_thread = threading.Thread(target=self._timeout_monitor_worker, daemon=True)
+        self.timeout_thread.start()
+    
+    def _stop_timeout_monitoring(self):
+        """停止超时监控"""
+        if self.timeout_thread is not None:
+            self.timeout_stop_event.set()
+            if self.timeout_thread.is_alive():
+                self.timeout_thread.join(timeout=1.0)  # 等待最多1秒
+    
+    def _timeout_monitor_worker(self):
+        """超时监控工作线程"""
+        while not self.timeout_stop_event.is_set() and self.state == AppState.RECORDING:
+            if self.recording_start_time is None:
+                break
+            
+            current_time = time.time()
+            elapsed_time = current_time - self.recording_start_time
+            
+            # 检查是否需要显示警告
+            if not self.warning_shown and elapsed_time >= config.WARNING_RECORDING_DURATION:
+                self._show_recording_warning(elapsed_time)
+                self.warning_shown = True
+            
+            # 检查是否超时
+            if elapsed_time >= config.MAX_RECORDING_DURATION:
+                self._handle_recording_timeout(elapsed_time)
+                break
+            
+            # 等待检查间隔或停止事件
+            self.timeout_stop_event.wait(config.TIMEOUT_CHECK_INTERVAL)
+    
+    def _show_recording_warning(self, elapsed_time: int):
+        """显示录音时长警告"""
+        remaining_time = config.MAX_RECORDING_DURATION - elapsed_time
+        elapsed_text = self._format_duration(int(elapsed_time))
+        remaining_text = self._format_duration(int(remaining_time))
+        
+        warning_msg = f"⚠️  录音时长警告: 已录音 {elapsed_text}，剩余 {remaining_text} 后将自动停止"
+        print(f"\n{warning_msg}")
+        
+        # 发送通知
+        if config.ENABLE_NOTIFICATIONS:
+            try:
+                notification_manager.show_warning_notification(warning_msg)
+            except:
+                pass  # 忽略通知错误
+    
+    def _handle_recording_timeout(self, elapsed_time: int):
+        """处理录音超时"""
+        elapsed_text = self._format_duration(int(elapsed_time))
+        timeout_msg = f"🚨 录音超时: 已录音 {elapsed_text}，自动停止录音"
+        print(f"\n{timeout_msg}")
+        
+        # 发送超时通知
+        if config.ENABLE_NOTIFICATIONS:
+            try:
+                notification_manager.show_error_notification(timeout_msg)
+            except:
+                pass  # 忽略通知错误
+        
+        # 自动停止录音
+        with self.state_lock:
+            if self.state == AppState.RECORDING:
+                self._stop_recording(auto_stopped=True)
+    
     def start(self):
         """启动应用"""
         if not self.transcriber.is_ready:
@@ -390,6 +527,9 @@ Gemini纠错: {gemini_status}
         print("正在关闭应用...")
         
         self.running = False
+        
+        # 停止超时监控
+        self._stop_timeout_monitoring()
         
         # 如果正在录音，先停止
         if self.state == AppState.RECORDING:

@@ -42,3 +42,18 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
+
+# 项目特定文件
+# 字典缓存和用户数据
+dic.txt.bak
+dictionary_cache/
+
+# 测试和演示文件
+demo_*.py
+test_*.py
+
+# UV包管理器生成的文件
+.uv/
+
+# 启动脚本的备份
+*.sh.bak
