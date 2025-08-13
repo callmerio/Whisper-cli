@@ -17,3 +17,5 @@ React 30%
 JavaScript 35%
 Python 30%
 API 25%
+DOM 20%
+git diff 30%

@@ -15,7 +15,7 @@ class GeminiCorrector:
     def __init__(self):
         """初始化Gemini纠错器"""
         self.api_key = config.GEMINI_API_KEY
-        self.model = "gemini-2.5-flash-lite-preview-06-17"  # 使用稳定的模型
+        self.model = config.GEMINI_MODEL  # 使用配置文件中的模型设置
         self.is_ready = bool(self.api_key)
         
         if self.is_ready:

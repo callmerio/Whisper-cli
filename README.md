@@ -1,17 +1,18 @@
-# 🎤 Whisper-CLI 实时语音转录系统
+# 🎤 Gemini 语音转录系统
 
-基于 whisper.cpp 的高性能中文语音转录系统，支持实时录音、AI纠错和剪贴板集成。
+基于 Google Gemini-2.5-Flash 的高性能中文语音转录系统，支持实时录音、AI纠错和剪贴板集成。
 
 ## ✨ 核心功能
 
 - 🎙️ **实时录音** - 双击 Option 键控制录音开始/停止
-- 🧠 **Whisper转录** - 使用 whisper.cpp 高精度语音识别
-- 🤖 **AI智能纠错** - Gemini 2.5 Flash 自动纠错和标点优化
+- 🧠 **Gemini转录** - 使用 Gemini-2.5-Flash 云端高精度语音识别
+- 🤖 **AI智能纠错** - Gemini-2.5-Flash-Lite 自动纠错和标点优化
 - 📋 **剪贴板集成** - 转录结果自动复制到剪贴板
 - 🔔 **智能通知** - 多种通知方式：系统通知、声音提示、视觉反馈
 - 📚 **用户词典** - 自定义词汇权重提升识别准确率
-- ⏱️ **性能监控** - 详细的处理时间统计
+- ⏱️ **性能监控** - 详细的处理时间统计和自动重试机制
 - 🌐 **代理支持** - 支持系统代理访问AI服务
+- ⚙️ **智能选择** - 启动时可选择模型和思考模式
 
 ## 🚀 快速开始
 
@@ -19,7 +20,7 @@
 
 - Python 3.8+
 - macOS (支持全局快捷键)
-- whisper.cpp 或 whisper-cli
+- Google Gemini API 密钥
 - 音频输入设备
 
 ### 2. 安装依赖
@@ -29,171 +30,161 @@
 uv sync
 
 # 或使用 pip
-pip install -r requirements.txt
+pip install google-genai python-dotenv pynput sounddevice numpy pyperclip
 ```
 
-### 3. 安装 Whisper
+### 3. 配置 API 密钥
+
+创建 `.env` 文件：
 
 ```bash
-# 使用 Homebrew 安装
-brew install whisper-cpp
-
-# 或下载预训练模型到指定路径
-# 默认路径: ~/Library/Application Support/MacWhisper/models/
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
-### 4. 配置环境
+获取 API 密钥：https://aistudio.google.com/app/apikey
 
-```bash
-# 复制环境配置文件
-cp .env.sample .env
+### 4. 启动程序
 
-# 编辑 .env 文件，设置 Gemini API 密钥
-# GEMINI_API_KEY=your_gemini_api_key_here
-
-# 或使用配置脚本
-./setup_env.sh your_gemini_api_key
-```
-
-### 5. 启动应用
-
-#### 方式一：智能启动 (推荐)
 ```bash
 ./start.sh
-```
-- 🔍 自动检查系统环境和依赖
-- 📋 显示详细的配置状态  
-- 📖 提供完整的使用指南
-- ⚙️ 检测权限和配置问题
-
-#### 方式二：快速启动
-```bash
-./quick-start.sh
-# 或直接运行
-uv run python main.py
 ```
 
 ## 🎯 使用方法
 
-1. **启动应用** - 运行启动脚本
-2. **开始录音** - 双击 Option 键
-3. **停止录音** - 再次双击 Option 键
-4. **获取结果** - 转录完成后自动复制到剪贴板
-5. **粘贴使用** - 在任意应用中 Cmd+V 粘贴结果
+### 基础操作
+1. 运行 `./start.sh` 启动系统
+2. 在启动时选择转录模型和思考模式
+3. 双击 **Option 键** 开始录音
+4. 再次双击 **Option 键** 停止录音
+5. 系统自动转录并复制到剪贴板
+6. 使用 **Cmd+V** 粘贴结果
 
-## ⚙️ 配置选项
+### 模型选择
+启动时可选择三种模式：
 
-### 基础配置 (`config.py`)
+**📋 转录模型选择:**
+- **Gemini 2.5 Pro** - 最高精度，功能最全面
+- **Gemini 2.5 Flash (推荐)** - 平衡性能和精度  
+- **Gemini 2.5 Flash Lite** - 最快速度，无思考模式
 
-```python
-# 音频设置
-SAMPLE_RATE = 16000  # 采样率
-CHANNELS = 1         # 声道数
+**🧠 思考模式选择:**
+- **快速模式 (推荐)** - 无思考，响应快速
+- **平衡模式** - 适度思考，平衡速度和精度
+- **精确模式** - 深度思考，最高精度
 
-# Whisper 设置
-WHISPER_MODEL = "turbo"          # 模型类型
-WHISPER_LANGUAGE = "zh"          # 识别语言
+*注：Flash Lite 模式自动使用快速模式*
 
-# 功能开关
-ENABLE_GEMINI_CORRECTION = True  # AI纠错
-ENABLE_CLIPBOARD = True          # 剪贴板
-USE_PROXY = True                 # 代理支持
-
-# 通知设置
-ENABLE_NOTIFICATIONS = True       # 通知系统
-ENABLE_SYSTEM_NOTIFICATIONS = True  # 系统通知
-ENABLE_SOUND_NOTIFICATIONS = True   # 声音提示
-ENABLE_VISUAL_NOTIFICATIONS = True  # 视觉反馈
-
-# 调试模式
-DEBUG_MODE = False               # 调试信息
-```
-
-### 用户词典 (`dic.txt`)
+## 📁 项目结构
 
 ```
-测试 40%
-语音 35%
-转录 40%
-效果 30%
-# 格式: 词汇 权重%
+Gemini-Speech-to-Text/
+├── main.py                    # 主程序
+├── start.sh                   # 启动脚本
+├── config.py                  # 配置文件
+├── gemini_transcriber.py      # Gemini 转录器
+├── gemini_corrector.py        # Gemini 纠错器
+├── hotkey_listener.py         # 快捷键监听
+├── audio_recorder.py          # 音频录制
+├── dictionary_manager.py      # 词典管理
+├── notification_utils.py      # 通知工具
+├── timer_utils.py             # 计时工具
+├── dic.txt                    # 用户词典
+├── .env                       # 环境变量
+└── pyproject.toml             # 项目依赖
 ```
 
-### 环境变量 (`.env`)
+## ⚙️ 配置说明
 
-```bash
-# Gemini API 密钥
-GEMINI_API_KEY=your_api_key_here
+### 主要配置项
 
-# 代理设置 (可选)
-HTTP_PROXY=http://127.0.0.1:7890
-HTTPS_PROXY=http://127.0.0.1:7890
+在 `config.py` 中可以调整：
+
+- **模型配置**: 转录和纠错模型选择
+- **音频设置**: 采样率、缓冲区大小等
+- **快捷键**: 默认为双击 Option 键
+- **通知方式**: 系统通知、声音、视觉提示
+- **词典设置**: 相似度阈值、权重影响
+- **代理设置**: HTTP/HTTPS 代理配置
+
+### 用户词典
+
+编辑 `dic.txt` 添加专业词汇：
+
+```
+# 格式：词汇:权重
+React:30.0%
+JavaScript:35.0%
+API:25.0%
+数据库:30.0%
 ```
 
-## 📊 性能特点
+## 🔧 高级功能
 
-- **录音无时长限制** - 支持长时间连续录音
-- **毫秒级计时** - 精确的性能分析
-- **内存优化** - 动态音频缓冲
-- **多线程处理** - 并发音频处理
+### 错误处理与重试
+- 自动检测网络错误并重试
+- 智能识别 API 超时和服务故障
+- 最大重试 3 次，间隔 2 秒
 
-### 典型处理时间
+### 性能监控
+- 详细的处理时间统计
+- 分步计时：录音、转录、纠错、词典处理
+- 调试模式显示完整性能分析
 
-- 录音: 实时
-- Whisper转录: ~0.3x 音频时长
-- Gemini纠错: ~1-3秒
-- 剪贴板操作: <10ms
+### 通知系统
+- **系统通知**: macOS 通知中心弹窗
+- **声音反馈**: 不同操作播放对应音效  
+- **视觉提示**: 控制台状态显示
 
-## 🛠️ 工具脚本
+## 🤝 相比 Whisper 版本的优势
 
-- `proxy_test.py` - 代理连接测试
-- `setup_env.sh` - 环境配置助手
-- `timer_utils.py` - 计时工具模块
+| 特性 | Gemini 版本 | Whisper 版本 |
+|------|-------------|--------------|
+| **依赖** | 无需本地模型 | 需要安装 whisper.cpp |
+| **速度** | 云端并行处理 | 本地处理较慢 |
+| **准确度** | 针对中文优化 | 通用模型 |
+| **维护** | Google 持续更新 | 需要手动更新模型 |
+| **配置** | 简单的 API 密钥 | 复杂的模型管理 |
 
-## 🔧 故障排除
+## 📝 开发说明
+
+### 核心模块
+
+- **主程序** (`main.py`): 应用主循环和状态管理
+- **转录器** (`gemini_transcriber.py`): Gemini 音频转录实现
+- **纠错器** (`gemini_corrector.py`): Gemini 文本纠错实现
+- **录音器** (`audio_recorder.py`): 音频采集和处理
+- **快捷键** (`hotkey_listener.py`): 全局快捷键监听
+
+### 自定义开发
+
+可以通过修改配置文件和提示词来定制：
+
+1. **转录提示词** (`GEMINI_TRANSCRIPTION_PROMPT`): 调整转录要求
+2. **纠错提示词** (`GEMINI_CORRECTION_PROMPT`): 自定义纠错规则  
+3. **模型选择**: 根据需要选择不同的 Gemini 模型
+4. **思考模式**: 调整 thinking budget 平衡速度和质量
+
+## 🐛 故障排除
 
 ### 常见问题
 
-1. **快捷键无响应**
-   - 检查辅助功能权限 (系统偏好设置 > 安全性与隐私 > 辅助功能)
-
-2. **Whisper转录失败**
-   - 确认 whisper-cli 安装: `which whisper-cli`
-   - 检查模型文件路径
-
-3. **Gemini纠错失败**
-   - 验证API密钥设置
-   - 测试代理连接: `python proxy_test.py`
-
-4. **音频录制问题**
-   - 检查麦克风权限
-   - 确认音频设备可用
+1. **权限问题**: 首次运行需要授权麦克风和辅助功能权限
+2. **API 密钥**: 确保 Gemini API 密钥正确且有效
+3. **网络问题**: 检查代理设置和网络连接
+4. **音频设备**: 确保麦克风设备正常工作
 
 ### 调试模式
 
-启用详细日志:
-```python
-DEBUG_MODE = True  # 在 config.py 中设置
-```
-
-## 📝 更新日志
-
-### v1.0.0
-- ✅ 实时语音转录
-- ✅ Gemini AI纠错
-- ✅ 剪贴板集成
-- ✅ 用户词典支持
-- ✅ 性能计时统计
-- ✅ 代理支持
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
+设置 `DEBUG_MODE = True` 查看详细日志：
+- API 调用详情
+- 音频文件信息  
+- 性能统计数据
+- 错误堆栈信息
 
 ## 📄 许可证
 
-MIT License
+本项目仅供学习和研究使用。
 
 ---
 
-**🎯 享受高效的语音转录体验！**
+🎉 **享受智能语音转录体验！** 如有问题请提交 Issue。

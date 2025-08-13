@@ -6,3 +6,12 @@ python-dotenv>=1.0.0
 httpx>=0.25.0
 google-genai>=1.26.0
 requests>=2.31.0
+
+# macOS 原生语音识别支持
+pyobjc-framework-Speech>=9.0
+pyobjc-framework-AVFoundation>=9.0
+pyobjc-core>=9.0
+
+# 可选依赖（用于音频文件处理）
+soundfile>=0.12.1
+scipy>=1.10.0

@@ -6,13 +6,19 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "google-genai>=1.26.0",
+    "google-generativeai>=0.8.5",
     "httpx[socks]>=0.28.1",
     "numpy>=2.2.6",
     "openai-whisper>=20250625",
     "pynput>=1.8.1",
+    "pyobjc-core>=11.1",
+    "pyobjc-framework-avfoundation>=11.1",
+    "pyobjc-framework-speech>=11.1",
     "pyperclip>=1.9.0",
     "python-dotenv>=1.1.1",
+    "scipy>=1.16.1",
     "sounddevice>=0.5.2",
+    "soundfile>=0.13.1",
     "youtube-transcript-api>=1.2.0",
     "yt-dlp>=2025.6.30",
 ]

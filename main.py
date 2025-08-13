@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-实时语音转录系统主程序
-支持 Option+R 快捷键控制，实时转录和用户词典优化
+基于 Gemini-2.5-Flash 的语音转录系统主程序
+使用 Gemini 进行音频转录，支持 Option+R 快捷键控制
 """
 
 import time
@@ -15,7 +15,7 @@ import pyperclip
 # 导入各个模块
 from hotkey_listener import HotkeyListener
 from audio_recorder import AudioRecorder
-from transcriber import WhisperTranscriber
+from gemini_transcriber import GeminiTranscriber  # 使用 Gemini 转录器
 from dictionary_manager import DictionaryManager
 from gemini_corrector import GeminiCorrector
 from timer_utils import Timer
@@ -29,25 +29,23 @@ class AppState(Enum):
     PROCESSING = "处理中"
     COMPLETE = "完成"
 
-class VoiceTranscriptionApp:
+class GeminiVoiceTranscriptionApp:
     def __init__(self):
-        """初始化语音转录应用"""
+        """初始化基于 Gemini 的语音转录应用"""
         self.state = AppState.IDLE
         self.state_lock = threading.Lock()
         
         # 组件初始化
         self.hotkey_listener = HotkeyListener(self._on_hotkey_pressed)
         self.audio_recorder = AudioRecorder()
-        self.transcriber = WhisperTranscriber()
+        self.transcriber = GeminiTranscriber()  # 使用 Gemini 转录器
         self.dictionary_manager = DictionaryManager()
         self.gemini_corrector = GeminiCorrector()
-        self.timer = Timer()  # 计时器
+        self.timer = Timer()
         
         # 转录数据
         self.current_session_audio = None
-        self.partial_transcripts = []  # 存储所有部分转录文本
         self.final_transcript = None
-        self.all_transcript_segments = []  # 存储所有转录片段
         
         # 运行标志
         self.running = False
@@ -58,8 +56,10 @@ class VoiceTranscriptionApp:
         self.timeout_stop_event = threading.Event()
         self.warning_shown = False
         
+        # 状态检查
         clipboard_status = "✅" if config.ENABLE_CLIPBOARD else "❌"
-        gemini_status = "✅" if config.ENABLE_GEMINI_CORRECTION and self.gemini_corrector.is_ready else "❌"
+        gemini_transcription_status = "✅" if self.transcriber.is_ready else "❌"
+        gemini_correction_status = "✅" if config.ENABLE_GEMINI_CORRECTION and self.gemini_corrector.is_ready else "❌"
         notification_status = "✅" if config.ENABLE_NOTIFICATIONS else "❌"
         
         max_duration_hours = config.MAX_RECORDING_DURATION // 3600
@@ -67,14 +67,16 @@ class VoiceTranscriptionApp:
         duration_text = f"{max_duration_hours}小时{max_duration_minutes}分钟" if max_duration_hours > 0 else f"{max_duration_minutes}分钟"
         
         print(f"""
-🎤 实时语音转录系统 v1.0
+🎤 Gemini 语音转录系统 v1.0
 ================================
 快捷键: 双击 Option 键 (切换录音)
 状态: {self.state.value}
-模型: {config.WHISPER_MODEL}
+转录引擎: Gemini-{config.GEMINI_TRANSCRIPTION_MODEL}
+纠错引擎: {config.GEMINI_MODEL}
 词典: {len(self.dictionary_manager.user_dict)} 个词汇
 剪贴板: {clipboard_status}
-Gemini纠错: {gemini_status}
+Gemini转录: {gemini_transcription_status}
+Gemini纠错: {gemini_correction_status}
 通知系统: {notification_status}
 最大录音时长: {duration_text}
 ================================
@@ -99,11 +101,10 @@ Gemini纠错: {gemini_status}
         print(f"\n{'='*50}")
         print(f"🎤 开始录音... (再次双击 Option 键停止)")
         print(f"⏰ 最大录音时长: {max_duration_text}")
+        print(f"🌐 转录引擎: Gemini-{config.GEMINI_TRANSCRIPTION_MODEL}")
         print(f"{'='*50}")
         
         # 清空之前的数据
-        self.partial_transcripts.clear()
-        self.all_transcript_segments.clear()
         self.final_transcript = None
         self.current_session_audio = None
         
@@ -123,7 +124,7 @@ Gemini纠错: {gemini_status}
         # 启动超时检查线程
         self._start_timeout_monitoring()
         
-        # 开始录音（简化，不用实时处理）
+        # 开始录音
         success = self.audio_recorder.start_recording()
         
         if success:
@@ -147,6 +148,7 @@ Gemini纠错: {gemini_status}
         stop_reason = "自动停止（超时）" if auto_stopped else "手动停止"
         print(f"\n{'='*50}")
         print(f"⏹️  停止录音，正在处理... ({stop_reason})")
+        print(f"🌐 使用 Gemini-{config.GEMINI_TRANSCRIPTION_MODEL} 转录")
         print(f"{'='*50}")
         
         # 更新状态
@@ -161,129 +163,140 @@ Gemini纠错: {gemini_status}
         final_audio = self.audio_recorder.stop_recording()
         self.current_session_audio = final_audio
         
-        # 直接转录完整音频（简化）
+        # 使用 Gemini 转录完整音频
         if final_audio is not None and len(final_audio) > 0:
-            print("🎯 开始转录...")
+            print("🎯 开始 Gemini 转录...")
             
-            # 开始Whisper转录计时
-            self.timer.start("whisper_transcription")
+            # 开始 Gemini 转录计时
+            self.timer.start("gemini_transcription")
             
-            # 直接调用同步转录
+            # 直接调用 Gemini 同步转录
             transcript = self.transcriber.transcribe_complete_audio(final_audio)
             
-            # 停止Whisper转录计时
-            whisper_time = self.timer.stop("whisper_transcription")
-            if whisper_time:
-                print(f"⏱️  Whisper转录耗时: {self.timer.format_duration(whisper_time.duration_ms)}")
+            # 停止 Gemini 转录计时
+            gemini_time = self.timer.stop("gemini_transcription")
+            if gemini_time:
+                print(f"⏱️  Gemini转录耗时: {self.timer.format_duration(gemini_time.duration_ms)}")
             
             if transcript:
-                # 开始词典优化计时
-                self.timer.start("dictionary_processing")
-                
-                # 应用用户词典优化
-                optimized_transcript = self.dictionary_manager.process_transcript(transcript)
-                
-                # 停止词典优化计时
-                dict_time = self.timer.stop("dictionary_processing")
-                if dict_time:
-                    print(f"⏱️  词典处理耗时: {self.timer.format_duration(dict_time.duration_ms)}")
-                
-                # 提取原始转录文本
-                combined_text = ""
-                for entry in optimized_transcript:
-                    text = entry.get('text', '').strip()
-                    if text:
-                        combined_text += text + " "
-                
-                raw_text = combined_text.strip()
-                if raw_text and config.ENABLE_CLIPBOARD:
-                    # 开始剪贴板操作计时
-                    self.timer.start("clipboard_copy")
-                    
-                    # 立即复制原始转录结果到剪贴板
-                    try:
-                        pyperclip.copy(raw_text)
-                        clipboard_time = self.timer.stop("clipboard_copy")
-                        
-                        # 使用新的通知系统
-                        if config.ENABLE_NOTIFICATIONS:
-                            notification_manager.show_clipboard_notification(raw_text, "原始")
-                        else:
-                            # 保留原有的控制台输出
-                            if clipboard_time:
-                                print(f"📋 原始转录已复制到剪贴板 ({self.timer.format_duration(clipboard_time.duration_ms)})")
-                            else:
-                                print("📋 原始转录已复制到剪贴板")
-                                
-                    except Exception as e:
-                        self.timer.stop("clipboard_copy")
-                        if config.ENABLE_NOTIFICATIONS:
-                            notification_manager.show_error_notification(f"复制到剪贴板失败: {e}")
-                        else:
-                            print(f"⚠️  复制到剪贴板失败: {e}")
-                
-                # Gemini纠错处理
-                if config.ENABLE_GEMINI_CORRECTION and raw_text:
-                    print("🤖 Gemini纠错中...")
-                    
-                    # 开始Gemini纠错计时
-                    self.timer.start("gemini_correction")
-                    
-                    corrected_text = self.gemini_corrector.correct_transcript(raw_text)
-                    
-                    # 停止Gemini纠错计时
-                    gemini_time = self.timer.stop("gemini_correction")
-                    
-                    if corrected_text and corrected_text.strip() != raw_text:
-                        # 更新转录结果
-                        optimized_transcript = [{
-                            'start': 0.0,
-                            'duration': len(optimized_transcript) * 2.0,
-                            'text': corrected_text,
-                            'gemini_corrected': True
-                        }]
-                        
-                        # 用纠错后的文本覆盖剪贴板
-                        if config.ENABLE_CLIPBOARD:
-                            self.timer.start("clipboard_update")
-                            try:
-                                pyperclip.copy(corrected_text.strip())
-                                clipboard_update_time = self.timer.stop("clipboard_update")
-                                
-                                # 使用新的通知系统显示纠错完成
-                                if config.ENABLE_NOTIFICATIONS:
-                                    notification_manager.show_clipboard_notification(corrected_text.strip(), "纠错")
-                                else:
-                                    # 保留原有的控制台输出
-                                    if gemini_time and clipboard_update_time:
-                                        print(f"✅ Gemini纠错完成 ({self.timer.format_duration(gemini_time.duration_ms)})，已更新剪贴板 ({self.timer.format_duration(clipboard_update_time.duration_ms)})")
-                                    else:
-                                        print("✅ Gemini纠错完成，已更新剪贴板")
-                                        
-                            except Exception as e:
-                                self.timer.stop("clipboard_update")
-                                if config.ENABLE_NOTIFICATIONS:
-                                    notification_manager.show_error_notification(f"更新剪贴板失败: {e}")
-                                else:
-                                    print(f"⚠️  更新剪贴板失败: {e}")
-                        else:
-                            if gemini_time:
-                                print(f"✅ Gemini纠错完成 ({self.timer.format_duration(gemini_time.duration_ms)})")
-                            else:
-                                print("✅ Gemini纠错完成")
-                    else:
-                        if gemini_time:
-                            print(f"ℹ️  无需纠错 ({self.timer.format_duration(gemini_time.duration_ms)})，剪贴板保持原始内容")
-                        else:
-                            print("ℹ️  无需纠错，剪贴板保持原始内容")
-                
-                self.final_transcript = optimized_transcript
-            
-            self._finish_session()
+                # 处理转录结果
+                self._process_transcript_result(transcript)
+            else:
+                print("❌ Gemini 转录失败")
+                self._finish_session()
         else:
             print("❌ 未录制到有效音频")
             self._finish_session()
     
+    def _process_transcript_result(self, raw_transcript: str):
+        """处理转录结果"""
+        # 开始词典优化计时
+        self.timer.start("dictionary_processing")
+        
+        # 创建类似原系统的数据结构
+        transcript_data = [{'text': raw_transcript, 'start': 0.0, 'duration': 0.0}]
+        
+        # 应用用户词典优化
+        optimized_transcript = self.dictionary_manager.process_transcript(transcript_data)
+        
+        # 停止词典优化计时
+        dict_time = self.timer.stop("dictionary_processing")
+        if dict_time:
+            print(f"⏱️  词典处理耗时: {self.timer.format_duration(dict_time.duration_ms)}")
+        
+        # 提取优化后的文本
+        combined_text = ""
+        for entry in optimized_transcript:
+            text = entry.get('text', '').strip()
+            if text:
+                combined_text += text + " "
+        
+        processed_text = combined_text.strip()
+        
+        # 复制原始转录到剪贴板
+        if processed_text and config.ENABLE_CLIPBOARD:
+            self.timer.start("clipboard_copy")
+            
+            try:
+                pyperclip.copy(processed_text)
+                clipboard_time = self.timer.stop("clipboard_copy")
+                
+                # 使用新的通知系统
+                if config.ENABLE_NOTIFICATIONS:
+                    notification_manager.show_clipboard_notification(processed_text, "Gemini转录")
+                else:
+                    if clipboard_time:
+                        print(f"📋 转录结果已复制到剪贴板 ({self.timer.format_duration(clipboard_time.duration_ms)})")
+                    else:
+                        print("📋 转录结果已复制到剪贴板")
+                        
+            except Exception as e:
+                self.timer.stop("clipboard_copy")
+                if config.ENABLE_NOTIFICATIONS:
+                    notification_manager.show_error_notification(f"复制到剪贴板失败: {e}")
+                else:
+                    print(f"⚠️  复制到剪贴板失败: {e}")
+        
+        # Gemini 纠错处理（如果启用且不同的模型）
+        if (config.ENABLE_GEMINI_CORRECTION and 
+            config.GEMINI_MODEL != config.GEMINI_TRANSCRIPTION_MODEL and 
+            processed_text):
+            
+            print(f"🤖 使用 {config.GEMINI_MODEL} 进行纠错...")
+            
+            # 开始 Gemini 纠错计时
+            self.timer.start("gemini_correction")
+            
+            corrected_text = self.gemini_corrector.correct_transcript(processed_text)
+            
+            # 停止 Gemini 纠错计时
+            correction_time = self.timer.stop("gemini_correction")
+            
+            if corrected_text and corrected_text.strip() != processed_text:
+                # 更新转录结果
+                optimized_transcript = [{
+                    'start': 0.0,
+                    'duration': 0.0,
+                    'text': corrected_text,
+                    'gemini_transcribed': True,
+                    'gemini_corrected': True
+                }]
+                
+                # 用纠错后的文本覆盖剪贴板
+                if config.ENABLE_CLIPBOARD:
+                    self.timer.start("clipboard_update")
+                    try:
+                        pyperclip.copy(corrected_text.strip())
+                        clipboard_update_time = self.timer.stop("clipboard_update")
+                        
+                        # 使用新的通知系统显示纠错完成
+                        if config.ENABLE_NOTIFICATIONS:
+                            notification_manager.show_clipboard_notification(corrected_text.strip(), "纠错完成")
+                        else:
+                            if correction_time and clipboard_update_time:
+                                print(f"✅ Gemini纠错完成 ({self.timer.format_duration(correction_time.duration_ms)})，已更新剪贴板 ({self.timer.format_duration(clipboard_update_time.duration_ms)})")
+                            else:
+                                print("✅ Gemini纠错完成，已更新剪贴板")
+                                
+                    except Exception as e:
+                        self.timer.stop("clipboard_update")
+                        if config.ENABLE_NOTIFICATIONS:
+                            notification_manager.show_error_notification(f"更新剪贴板失败: {e}")
+                        else:
+                            print(f"⚠️  更新剪贴板失败: {e}")
+                else:
+                    if correction_time:
+                        print(f"✅ Gemini纠错完成 ({self.timer.format_duration(correction_time.duration_ms)})")
+                    else:
+                        print("✅ Gemini纠错完成")
+            else:
+                if correction_time:
+                    print(f"ℹ️  无需纠错 ({self.timer.format_duration(correction_time.duration_ms)})，剪贴板保持原始内容")
+                else:
+                    print("ℹ️  无需纠错，剪贴板保持原始内容")
+        
+        self.final_transcript = optimized_transcript
+        self._finish_session()
     
     def _finish_session(self):
         """完成会话处理"""
@@ -317,18 +330,30 @@ Gemini纠错: {gemini_status}
         print(f"{'='*60}")
         
         if self.final_transcript:
-            # 显示优化后的结果（简化，不显示时间戳）
+            # 显示结果
             full_text = ""
-            gemini_used = False
+            gemini_transcribed = False
+            gemini_corrected = False
+            
             for entry in self.final_transcript:
                 text = entry.get('text', '').strip()
                 if text:
                     full_text += text + " "
+                if entry.get('gemini_transcribed', False):
+                    gemini_transcribed = True
                 if entry.get('gemini_corrected', False):
-                    gemini_used = True
+                    gemini_corrected = True
             
-            correction_info = " (Gemini纠错)" if gemini_used else " (原始转录)"
-            print(f"📝 完整转录内容{correction_info}:")
+            # 显示处理信息
+            process_info = []
+            if gemini_transcribed:
+                process_info.append(f"Gemini-{config.GEMINI_TRANSCRIPTION_MODEL}转录")
+            if gemini_corrected:
+                process_info.append(f"{config.GEMINI_MODEL}纠错")
+            
+            process_text = " + ".join(process_info) if process_info else "Gemini转录"
+            
+            print(f"📝 完整转录内容 ({process_text}):")
             print(f"{'-'*50}")
             print(full_text.strip())
             print(f"{'-'*50}")
@@ -337,19 +362,12 @@ Gemini纠错: {gemini_status}
             if config.DEBUG_MODE:
                 self._show_replacement_stats()
                 
-        elif self.partial_transcripts:
-            # 如果没有最终转录，显示合并的部分结果
-            combined_text = ' '.join(self.partial_transcripts)
-            print(f"📝 转录内容 (基于部分结果):")
-            print(f"{'-'*50}")
-            print(combined_text)
-            print(f"{'-'*50}")
         else:
             print(f"❌ 未获取到转录结果")
             print(f"可能原因:")
             print(f"  - 录音时间过短")
             print(f"  - 音频质量不佳")
-            print(f"  - 背景噪音过大")
+            print(f"  - Gemini API 连接问题")
         
         print(f"{'='*60}")
     
@@ -385,14 +403,14 @@ Gemini纠错: {gemini_status}
             if timings:
                 print(f"\n⏱️  处理时间:")
                 for name, timing in timings.items():
-                    if name in ["recording", "whisper_transcription", "gemini_correction"]:
+                    if name in ["recording", "gemini_transcription", "gemini_correction"]:
                         print(f"  {self._format_timing_name(name)}: {self.timer.format_duration(timing.duration_ms)}")
     
     def _format_timing_name(self, name: str) -> str:
         """格式化计时器名称显示"""
         name_map = {
             "recording": "录音时长",
-            "whisper_transcription": "Whisper转录",
+            "gemini_transcription": "Gemini转录",
             "gemini_correction": "Gemini纠错",
             "dictionary_processing": "词典处理",
             "clipboard_copy": "剪贴板复制",
@@ -414,6 +432,7 @@ Gemini纠错: {gemini_status}
         else:
             return f"{secs}秒"
     
+    # 超时监控相关方法（与原版相同）
     def _start_timeout_monitoring(self):
         """启动超时监控线程"""
         if self.timeout_thread is not None and self.timeout_thread.is_alive():
@@ -427,7 +446,7 @@ Gemini纠错: {gemini_status}
         if self.timeout_thread is not None:
             self.timeout_stop_event.set()
             if self.timeout_thread.is_alive():
-                self.timeout_thread.join(timeout=1.0)  # 等待最多1秒
+                self.timeout_thread.join(timeout=1.0)
     
     def _timeout_monitor_worker(self):
         """超时监控工作线程"""
@@ -465,7 +484,7 @@ Gemini纠错: {gemini_status}
             try:
                 notification_manager.show_warning_notification(warning_msg)
             except:
-                pass  # 忽略通知错误
+                pass
     
     def _handle_recording_timeout(self, elapsed_time: int):
         """处理录音超时"""
@@ -478,7 +497,7 @@ Gemini纠错: {gemini_status}
             try:
                 notification_manager.show_error_notification(timeout_msg)
             except:
-                pass  # 忽略通知错误
+                pass
         
         # 自动停止录音
         with self.state_lock:
@@ -488,7 +507,7 @@ Gemini纠错: {gemini_status}
     def start(self):
         """启动应用"""
         if not self.transcriber.is_ready:
-            print("❌ 转录器未准备就绪，请检查 whisper.cpp 安装和模型文件")
+            print("❌ Gemini 转录器未准备就绪，请检查 API 配置")
             return False
         
         self.running = True
@@ -498,12 +517,18 @@ Gemini纠错: {gemini_status}
             print("❌ 快捷键监听启动失败")
             return False
         
-        print("🚀 应用已启动，双击 Option 键开始录音")
+        print("🚀 Gemini 语音转录系统已启动，双击 Option 键开始录音")
         print("按 Ctrl+C 退出程序")
         
         # 显示设备信息
         if config.DEBUG_MODE:
             self.audio_recorder.get_device_info()
+            
+            # 显示 Gemini 转录器信息
+            transcriber_info = self.transcriber.get_model_info()
+            print(f"\n🤖 Gemini 转录器信息:")
+            for key, value in transcriber_info.items():
+                print(f"  {key}: {value}")
         
         try:
             # 主循环
@@ -543,10 +568,12 @@ Gemini纠错: {gemini_status}
         
         print("✅ 应用已关闭")
 
+
 def signal_handler(sig, frame):
     """信号处理器"""
     print(f"\n收到信号 {sig}，正在退出...")
     sys.exit(0)
+
 
 def main():
     """主函数"""
@@ -555,7 +582,7 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
     
     # 创建并启动应用
-    app = VoiceTranscriptionApp()
+    app = GeminiVoiceTranscriptionApp()
     
     try:
         success = app.start()
@@ -567,6 +594,7 @@ def main():
             import traceback
             traceback.print_exc()
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
