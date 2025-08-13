@@ -20,6 +20,7 @@ from dictionary_manager import DictionaryManager
 from gemini_corrector import GeminiCorrector
 from timer_utils import Timer
 from notification_utils import notification_manager
+from audio_retry_manager import audio_retry_manager  # 导入重试管理器
 import config
 
 class AppState(Enum):
@@ -42,6 +43,14 @@ class GeminiVoiceTranscriptionApp:
         self.dictionary_manager = DictionaryManager()
         self.gemini_corrector = GeminiCorrector()
         self.timer = Timer()
+        
+        # 重试管理器配置
+        self.retry_manager = audio_retry_manager
+        self.retry_manager.set_callbacks(
+            transcription_callback=self._transcription_callback,
+            success_callback=self._on_transcription_success,
+            failure_callback=self._on_transcription_failure
+        )
         
         # 转录数据
         self.current_session_audio = None
@@ -163,27 +172,27 @@ Gemini纠错: {gemini_correction_status}
         final_audio = self.audio_recorder.stop_recording()
         self.current_session_audio = final_audio
         
-        # 使用 Gemini 转录完整音频
+        # 使用重试管理器处理音频
         if final_audio is not None and len(final_audio) > 0:
-            print("🎯 开始 Gemini 转录...")
+            print("🎯 提交音频到重试管理器...")
             
-            # 开始 Gemini 转录计时
-            self.timer.start("gemini_transcription")
+            # 生成任务ID
+            task_id = f"session_{int(time.time() * 1000)}"
             
-            # 直接调用 Gemini 同步转录
-            transcript = self.transcriber.transcribe_complete_audio(final_audio)
+            # 提交到重试管理器，标记为强制立即处理（新录音覆盖机制）
+            self.retry_manager.submit_audio(
+                audio_data=final_audio,
+                task_id=task_id,
+                force_immediate=True,  # 新录音强制立即处理
+                metadata={
+                    "session_start": self.recording_start_time,
+                    "recording_duration": recording_time.duration_ms if recording_time else 0,
+                    "stop_reason": stop_reason
+                }
+            )
             
-            # 停止 Gemini 转录计时
-            gemini_time = self.timer.stop("gemini_transcription")
-            if gemini_time:
-                print(f"⏱️  Gemini转录耗时: {self.timer.format_duration(gemini_time.duration_ms)}")
-            
-            if transcript:
-                # 处理转录结果
-                self._process_transcript_result(transcript)
-            else:
-                print("❌ Gemini 转录失败")
-                self._finish_session()
+            # 状态保持处理中，等待回调
+            print("⏳ 等待转录完成...")
         else:
             print("❌ 未录制到有效音频")
             self._finish_session()
@@ -504,6 +513,68 @@ Gemini纠错: {gemini_correction_status}
             if self.state == AppState.RECORDING:
                 self._stop_recording(auto_stopped=True)
     
+    # ==================== 重试管理器回调函数 ====================
+    
+    def _transcription_callback(self, audio_data) -> Optional[str]:
+        """重试管理器的转录回调函数"""
+        try:
+            # 开始转录计时
+            self.timer.start("gemini_transcription")
+            
+            # 调用 Gemini 转录
+            transcript = self.transcriber.transcribe_complete_audio(audio_data)
+            
+            # 停止转录计时
+            gemini_time = self.timer.stop("gemini_transcription")
+            if gemini_time:
+                print(f"⏱️  Gemini转录耗时: {self.timer.format_duration(gemini_time.duration_ms)}")
+            
+            return transcript
+            
+        except Exception as e:
+            self.timer.stop("gemini_transcription")
+            print(f"❌ 转录回调异常: {e}")
+            return None
+    
+    def _on_transcription_success(self, task_id: str, transcript: str):
+        """转录成功回调"""
+        print(f"✅ 任务 {task_id} 转录成功")
+        
+        # 如果当前状态是处理中，说明是当前会话的结果
+        if self.state == AppState.PROCESSING:
+            # 处理转录结果
+            self._process_transcript_result(transcript)
+        else:
+            # 这是重试任务的成功结果，直接处理并通知
+            print(f"🔄 重试任务成功: {transcript}")
+            
+            # 直接复制到剪贴板并通知
+            if config.ENABLE_CLIPBOARD:
+                try:
+                    pyperclip.copy(transcript)
+                    if config.ENABLE_NOTIFICATIONS:
+                        notification_manager.show_clipboard_notification(transcript, "重试转录成功")
+                    else:
+                        print(f"📋 重试结果已复制到剪贴板: {transcript}")
+                except Exception as e:
+                    print(f"⚠️  复制重试结果失败: {e}")
+    
+    def _on_transcription_failure(self, task_id: str, error_message: str):
+        """转录失败回调"""
+        print(f"❌ 任务 {task_id} 最终失败: {error_message}")
+        
+        # 如果当前状态是处理中，说明是当前会话的失败
+        if self.state == AppState.PROCESSING:
+            print("❌ 当前录音转录失败，将在后台重试")
+            # 完成当前会话，但重试会在后台继续
+            self._finish_session()
+        else:
+            # 这是重试任务的最终失败
+            if config.ENABLE_NOTIFICATIONS:
+                notification_manager.show_error_notification(f"音频转录最终失败: {error_message}")
+    
+    # ==================== 原有方法 ====================
+    
     def start(self):
         """启动应用"""
         if not self.transcriber.is_ready:
@@ -512,6 +583,9 @@ Gemini纠错: {gemini_correction_status}
         
         self.running = True
         
+        # 启动重试管理器
+        self.retry_manager.start()
+        
         # 启动快捷键监听
         if not self.hotkey_listener.start():
             print("❌ 快捷键监听启动失败")
@@ -519,6 +593,11 @@ Gemini纠错: {gemini_correction_status}
         
         print("🚀 Gemini 语音转录系统已启动，双击 Option 键开始录音")
         print("按 Ctrl+C 退出程序")
+        print("💡 提示: 即使录音转录失败，系统会在后台自动重试，确保不丢失任何音频")
+        
+        # 显示重试管理器状态
+        if config.DEBUG_MODE:
+            self.retry_manager.print_status()
         
         # 显示设备信息
         if config.DEBUG_MODE:
@@ -565,6 +644,9 @@ Gemini纠错: {gemini_correction_status}
         self.hotkey_listener.stop()
         self.audio_recorder.stop_recording()
         self.transcriber.stop_processing()
+        
+        # 停止重试管理器
+        self.retry_manager.stop()
         
         print("✅ 应用已关闭")
 

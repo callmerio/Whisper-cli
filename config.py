@@ -82,6 +82,7 @@ GEMINI_TRANSCRIPTION_PROMPT = """请转录这段中文音频，要求：
 5. 只输出转录文本，不要添加说明"""
 
 # Gemini API 配置
+GEMINI_BASE_URL = os.getenv('GEMINI_BASE_URL', '')  # 从环境变量读取Base URL
 GEMINI_REQUEST_TIMEOUT = 30  # 请求超时时间（秒）- 缩短超时时间
 GEMINI_MAX_RETRIES = 2  # 最大重试次数 - 减少重试次数
 GEMINI_RETRY_DELAY = 1  # 重试延迟（秒）- 减少重试延迟

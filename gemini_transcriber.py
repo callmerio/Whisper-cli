@@ -57,8 +57,15 @@ class GeminiTranscriber:
                         os.environ['HTTPS_PROXY'] = proxy_url
                         print(f"🌐 使用代理: {proxy_url}")
                 
-                # 创建Gemini客户端 (照搬纠错器的实现)
-                self.client = genai.Client(api_key=self.api_key)
+                # 创建Gemini客户端 (支持自定义BASE_URL)
+                http_options = None
+                if config.GEMINI_BASE_URL:
+                    # 如果配置了自定义BASE_URL，使用它
+                    from google.genai import types
+                    http_options = types.HttpOptions(base_url=config.GEMINI_BASE_URL)
+                    print(f"🔗 使用自定义BASE_URL: {config.GEMINI_BASE_URL}")
+                
+                self.client = genai.Client(api_key=self.api_key, http_options=http_options)
                 
                 print(f"✅ Gemini转录器已就绪 ({self.model})")
                 if config.DEBUG_MODE:
