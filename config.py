@@ -21,7 +21,11 @@ CHUNK_DURATION = 2.0  # 分段时长（秒）
 BUFFER_DURATION = 30.0  # 缓冲区时长（秒）
 
 # 快捷键配置
-HOTKEY_COMBINATION = ["option", "r"]  # Option+R
+HOTKEY_LONG_PRESS_KEY = "command"       # 长按 Command 键启动录音
+HOTKEY_LONG_PRESS_THRESHOLD = 0.03        # 长按阈值（秒）
+
+# 录音有效性配置
+MIN_TRANSCRIPTION_DURATION = 2.0         # 录音时长不超过该值（秒）将跳过转录
 
 # 用户词典配置
 DICTIONARY_WEIGHT_THRESHOLD = 0.6  # 相似度阈值
@@ -30,7 +34,7 @@ DICTIONARY_MAX_WEIGHT = 0.5  # 最大权重影响（避免过度替换）
 # ==================== Gemini 配置 ====================
 
 # Gemini 纠错配置
-ENABLE_GEMINI_CORRECTION = True  # 启用Gemini纠错
+ENABLE_GEMINI_CORRECTION = False  # 默认直接在转录阶段完成润色，可按需开启二次纠错
 GEMINI_MODEL = "gemini-2.5-flash-lite"  # Gemini 纠错模型
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')  # 从环境变量读取API密钥
 
@@ -74,12 +78,12 @@ GEMINI_AUDIO_MAX_SIZE = 20 * 1024 * 1024  # 最大音频文件大小 20MB
 GEMINI_AUDIO_FORMATS = ["wav", "mp3", "m4a", "flac"]  # 支持的音频格式
 
 # Gemini 转录提示词
-GEMINI_TRANSCRIPTION_PROMPT = """请转录这段中文音频，要求：
-1. 准确转录所有语音内容
-2. 添加合适的标点符号
-3. 保持自然的语言表达
-4. 输出简体中文
-5. 只输出转录文本，不要添加说明"""
+GEMINI_TRANSCRIPTION_PROMPT = """请转录这段中文音频，并直接完成以下处理：
+1. 精准还原语音内容，保留原有语气和口语化表达
+2. 自动添加恰当的标点符号（句号、逗号、问号、感叹号、破折号、省略号等）
+3. 修正明显的听写错误（同音、近音、错别字）以及基础语法问题
+4. 不要改变说话者的语气、态度或风格，不要增删额外信息
+5. 使用简体中文输出纯文本结果，不要包含任何说明、前缀或后缀"""
 
 # Gemini API 配置
 GEMINI_BASE_URL = os.getenv('GEMINI_BASE_URL', '')  # 从环境变量读取Base URL
@@ -92,6 +96,42 @@ GEMINI_AUDIO_COMPRESSION_ENABLED = True  # 启用音频压缩
 GEMINI_PARALLEL_PROCESSING_ENABLED = True  # 启用并行处理
 GEMINI_CHUNK_SIZE_SECONDS = 60  # 分片大小（秒）
 GEMINI_MAX_PARALLEL_CHUNKS = 3  # 最大并行处理的分片数
+
+# ==================== 语音活动检测 (VAD) 配置 ====================
+
+# VAD 基础配置
+VAD_VOLUME_THRESHOLD = 0.01  # 音量阈值（0.001-0.1，越小越敏感）
+VAD_SILENCE_DURATION = 4.0   # 静音检测时长（秒，用户可配置）
+VAD_MIN_SEGMENT_DURATION = 1.0  # 最小分段时长（秒）
+VAD_ANALYSIS_WINDOW = 0.1    # 分析窗口大小（秒）
+
+# ==================== 分段处理器配置 ====================
+
+# 分段处理基础配置
+SEGMENT_ENABLE_CORRECTION = False  # 默认关闭分段纠错，依赖转录提示词直接产出润色结果
+SEGMENT_ENABLE_DICTIONARY = True   # 启用分段词典处理
+SEGMENT_ENABLE_AUTO_OUTPUT = True  # 启用自动输出到光标位置
+SEGMENT_MAX_CONCURRENT = 3         # 最大并发分段处理数
+
+# 分段输出配置
+SEGMENT_OUTPUT_METHOD = "clipboard"  # 输出方法: "direct_type" | "clipboard" | "disabled"
+
+# ==================== 文本输入管理器配置 ====================
+
+# 文本输入基础配置
+TEXT_INPUT_METHOD = "clipboard"        # 默认输入方法: "direct_type" | "clipboard" | "disabled"
+TEXT_INPUT_DELAY = 0.1                   # 输入延迟（秒）
+TEXT_INPUT_CLIPBOARD_BACKUP = True       # 是否备份到剪贴板
+TEXT_INPUT_CHECK_PERMISSIONS = True      # 启动时检查权限
+AUTO_PASTE_ENABLED = True                # 处理完成后自动粘贴到光标位置
+
+# ==================== 会话模式配置 ====================
+
+# 默认会话模式配置
+DEFAULT_SESSION_MODE = "batch"          # 固定为一口气模式
+DEFAULT_SILENCE_DURATION = 4.0          # 默认静音检测时长（秒）
+DEFAULT_AUTO_OUTPUT_ENABLED = True      # 默认启用自动输出
+DEFAULT_CLIPBOARD_BACKUP = True         # 默认启用剪贴板备份
 
 # Gemini纠错润色提示词配置
 GEMINI_CORRECTION_PROMPT = """请对以下中文语音转录文本进行纠错和基础润色：
