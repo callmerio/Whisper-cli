@@ -89,3 +89,87 @@ Note: 本次会话执行全面代码审查，修复安全隐患和代码质量�
 - 2025-09-30：**配置验证** - 在 `config.py` 新增 `validate_config()` 函数，自动检查关键配置（API 密钥、数值范围、文件路径）的合法性，模块导入时自动验证并输出警告或错误。
 - 2025-09-30：**输入验证** - 为 `correction_memory.py` 的 `_append_correction()` 添加文本长度验证（上限 10000 字符），防止异常长文本写入。
 - 2025-09-30：**代码规范** - 统一错误处理风格，在 DEBUG_MODE 下输出详细错误信息，生产环境保持简洁提示，符合 SOLID 原则和最佳实践。
+
+## 会话：TypeScript 重构 Phase 1-2（2025-09-30）
+
+Note: 开始 TypeScript 版本重构，创建 monorepo 结构，完成 Phase 1（基础设施）和 Phase 2（核心工具）的开发。目标是用现代化的 TypeScript 技术栈重写整个系统，提升类型安全性和可维护性。
+
+### Phase 1: 基础设施与核心服务（2025-09-30 上午）
+
+- 2025-09-30 09:00：**项目结构重组** - 将现有 Python 代码移动到 `python/` 目录，创建 `typescript/` 目录用于新版本开发，形成 monorepo 结构。
+- 2025-09-30 09:15：**TypeScript 项目初始化** - 配置 `tsconfig.json`（strict mode）、`package.json`、`tsup.config.ts`（构建工具）、`.eslintrc.json`、`.prettierrc`，建立现代化开发工具链。
+- 2025-09-30 09:30：**配置系统（Zod 验证）** - 实现 `src/core/config.ts`，使用 Zod Schema 进行运行时验证，支持 30+ 配置项，自动从 `.env` 加载并打印配置摘要。
+- 2025-09-30 09:45：**增强日志系统** - 实现 `src/utils/logger.ts`，支持彩色输出（chalk）、日志级别控制（DEBUG/INFO/WARN/ERROR）、时间戳、子 Logger 功能。
+- 2025-09-30 10:00：**Result 类型系统** - 实现 `src/utils/result.ts`，Rust 风格的错误处理（`Result<T, E>`），提供 `ok`/`err`/`isOk`/`isErr` 以及 `map`/`andThen`/`unwrap` 工具函数。
+- 2025-09-30 10:15：**自定义错误体系** - 实现 `src/utils/errors.ts`，定义 `AppError` 基类和专用错误类型（`ConfigError`、`GeminiError`、`AudioError`、`FileSystemError` 等）。
+- 2025-09-30 10:30：**Gemini 客户端封装** - 实现 `src/services/gemini-client.ts`，封装 Google Generative AI SDK，提供音频转录、文本纠错、健康检查功能，支持重试机制和 SHA256 密钥指纹。
+- 2025-09-30 10:45：**主程序集成** - 创建 `src/index.ts`，集成配置加载、Gemini 客户端初始化、健康检查流程，成功启动并输出系统状态。
+
+### 代理配置支持（2025-09-30 中午）
+
+- 2025-09-30 11:00：**代理支持** - 发现 Google SDK 不支持自定义 baseUrl，添加 `SKIP_HEALTH_CHECK` 环境变量跳过健康检查，创建 `PROXY_GUIDE.md` 详细说明代理配置方法。
+- 2025-09-30 11:15：**crypto 模块修复** - 修复 ESM 模式下的 crypto 导入（使用 `import { createHash } from 'crypto'` 替代 `require('crypto')`）。
+- 2025-09-30 11:30：**测试验证** - 程序成功启动，配置验证通过，跳过健康检查模式正常工作，准备进入 Phase 2 开发。
+
+### Phase 2: 核心工具（2025-09-30 下午）
+
+- 2025-09-30 14:00：**文本处理工具** - 实现 `src/utils/text-utils.ts`，提供 Levenshtein 距离计算（`calculateSimilarity`）、文本规范化、中文检测、字数统计等工具函数。
+- 2025-09-30 14:15：**文件系统适配器** - 实现 `src/utils/file-adapter.ts`，封装 fs/promises，提供 `readTextFile`/`writeTextFile`/`readJsonFile`/`writeJsonFile`/`fileExists` 等函数，全部返回 Result 类型。
+- 2025-09-30 14:30：**词典管理器** - 实现 `src/managers/dictionary-manager.ts`（350+ 行），支持词典加载、智能替换、权重系统（0-100%）、相似度匹配、大小写保持等功能。
+  - 支持两种词典格式：`词汇:权重%` 和 `原词汇->目标词汇:权重%`
+  - 加载 15 个词典条目，平均权重 80.7%
+  - 成功测试替换：\"谷歌\" → \"GOOGLE\"，\"微软\" → \"MICROSOFT\"
+- 2025-09-30 15:00：**剪贴板管理器** - 实现 `src/managers/clipboard-manager.ts`（200+ 行），基于 clipboardy 库，提供：
+  - `read()`/`write()` - 基础读写，自动备份
+  - `restore()` - 恢复备份
+  - `append()` - 追加内容
+  - `writeSanitized()` - 清理并写入
+  - `getStats()` - 统计信息（字符/词/行数）
+- 2025-09-30 15:30：**CLI 命令行工具** - 实现 `src/cli.ts`（300+ 行），提供交互式测试命令：
+  - `pnpm cli dictionary` - 测试词典替换（4 个测试用例全部通过）
+  - `pnpm cli clipboard` - 测试剪贴板功能（读写/备份/恢复/统计全部正常）
+  - `pnpm cli correction` - 测试 Gemini 纠错
+  - `pnpm cli config` - 显示当前配置
+  - `pnpm cli transcribe` - 转录功能（待音频模块实现）
+- 2025-09-30 16:00：**集成测试** - 在主程序中集成词典和剪贴板测试，所有功能正常运行，系统初始化成功。
+
+### 技术成果总结
+
+**代码统计**：
+- TypeScript 文件：15 个
+- 总代码行数：~2000+ 行
+- 测试覆盖：CLI 工具提供交互式测试
+- 类型覆盖率：100%（严格模式）
+
+**核心模块**：
+1. 配置系统（Zod 验证，30+ 配置项）
+2. 日志系统（彩色输出，分级控制）
+3. Result 类型（Rust 风格错误处理）
+4. 自定义错误体系（7 种错误类型）
+5. Gemini 客户端（转录/纠错/健康检查）
+6. 词典管理器（智能替换，权重系统）
+7. 剪贴板管理器（完整的备份/恢复机制）
+8. 文件系统适配器（Result 模式封装）
+9. 文本处理工具（Levenshtein 距离等）
+
+**Git 提交记录**：
+- `b54f321` 🔒 代码质量与安全性加固
+- `8a2e398` 🚀 项目重构：引入 TypeScript 版本
+- `a5343df` 📝 更新 Roadmap: 添加 TypeScript 重构计划
+- `b9a7f9c` ✨ Phase 1 完成：TypeScript 基础设施与核心服务
+- `701ca6a` ✨ 配置代理支持和优化
+- `399fa2b` ✨ 完成词典管理系统
+- `3aae194` ✨ Phase 2 完成：剪贴板管理和 CLI 工具
+
+**下一步计划（Phase 3）**：
+- 音频录制模块（需要 Node.js 原生模块或外部库）
+- 热键监听（macOS 平台集成）
+- 会话管理器（状态机，多模式支持）
+- 完整转录流程（端到端集成）
+
+**经验总结**：
+1. **类型安全是王道**：Zod Schema + TypeScript strict mode 在编译时捕获了大量潜在错误
+2. **Result 模式优雅**：比 try-catch 更清晰，强制错误处理，代码可读性高
+3. **工具链重要**：ESLint + Prettier + tsx 提供了流畅的开发体验
+4. **测试驱动开发**：CLI 工具让每个模块都能独立测试，极大提升开发效率
+5. **渐进式重构**：保留 Python 版本，TypeScript 版本独立开发，降低风险
