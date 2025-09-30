@@ -13,12 +13,17 @@ from enum import Enum
 # 导入项目组件
 from voice_activity_detector import VoiceActivityDetector, VoiceSegment, VoiceActivityState
 from segment_processor import SegmentProcessor, ProcessedSegment, SegmentStatus
-from text_input_manager import TextInputManager, InputMethod, InputRequest, InputResult
+from text_input_manager import TextInputManager, InputMethod
 from audio_recorder import AudioRecorder
 from audio_retry_manager import audio_retry_manager
 from notification_utils import notification_manager
 from timer_utils import Timer
 import config
+
+
+_HOTKEY_LABELS = list(dict.fromkeys(config.HOTKEY_DISPLAY_LABELS)) or [config.HOTKEY_PRIMARY_LABEL]
+HOTKEY_HINT = " / ".join(_HOTKEY_LABELS)
+HOTKEY_PRIMARY_LABEL = config.HOTKEY_PRIMARY_LABEL
 
 
 class SessionMode(Enum):
@@ -256,7 +261,7 @@ class SessionModeManager:
                 return False
             
             print(f"✅ 一口气模式启动成功")
-            print(f"   松开 Command 键停止录音并处理")
+            print(f"   松开 {HOTKEY_PRIMARY_LABEL} 键停止录音并处理")
             
             return True
             
@@ -364,7 +369,7 @@ class SessionModeManager:
         print(
             f"⚠️ 会话录音时长 {recorded_seconds:.2f}s，小于最短转录要求 {min_duration:.0f}s，已跳过转录。"
         )
-        print("ℹ️ 请按住 Command 键更长时间以触发完整转录。")
+        print(f"ℹ️ 请按住 {HOTKEY_HINT} 键更长时间以触发完整转录。")
 
         if getattr(config, "ENABLE_NOTIFICATIONS", True):
             try:
@@ -452,27 +457,19 @@ class SessionModeManager:
             print(f"   最终文本: {segment.final_text}")
     
     def _on_segment_output(self, segment, text=None):
-        """分段输出回调"""
-        if self.config.auto_output_enabled and segment.final_text:
-            # 自动输出到光标位置
-            request = InputRequest(
-                text=segment.final_text,
-                method=self.config.output_method,
-                backup_to_clipboard=self.config.clipboard_backup,
-                request_id=segment.segment_id
-            )
-            
-            result = self.text_input_manager.input_text(request)
-            
-            if result == InputResult.SUCCESS:
-                print(f"📝 已输出到光标位置: {len(segment.final_text)} 字符")
-            else:
-                print(f"⚠️ 输出失败: {result.value}")
-        
+        """分段输出回调（SegmentProcessor 已完成实际输出）"""
+        final_text = text or (segment.final_text or "")
+
+        if not final_text:
+            return
+
+        if config.DEBUG_MODE:
+            print(f"🪄 分段输出完成: {len(final_text)} 字符")
+
         # 调用实时输出回调
         if self.on_realtime_output:
             try:
-                self.on_realtime_output(segment.final_text)
+                self.on_realtime_output(final_text)
             except Exception as e:
                 if config.DEBUG_MODE:
                     print(f"⚠️ 实时输出回调异常: {e}")

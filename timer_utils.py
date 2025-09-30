@@ -82,13 +82,20 @@ class Timer:
         print(f"\n📊 {title}")
         print("=" * 50)
         
-        total_time = 0
-        for timing in self.timings.values():
+        total_time = 0.0
+        total_session = None
+        for name, timing in self.timings.items():
             print(f"  {timing}")
-            total_time += timing.duration_ms
-        
+            if name == "total_session":
+                total_session = timing.duration_ms
+            else:
+                total_time += timing.duration_ms
+
         print("-" * 50)
-        print(f"  总耗时: {total_time:.1f}ms ({total_time/1000:.2f}s)")
+        if total_time:
+            print(f"  阶段合计: {total_time:.1f}ms ({total_time/1000:.2f}s)")
+        if total_session is not None:
+            print(f"  总耗时: {total_session:.1f}ms ({total_session/1000:.2f}s)")
         print("=" * 50)
     
     def reset(self) -> None:

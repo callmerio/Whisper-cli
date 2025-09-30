@@ -57,3 +57,5 @@ test_*.py
 
 # 启动脚本的备份
 *.sh.bak
+# @generate-docs.sh
+docs/code2prompt-output

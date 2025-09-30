@@ -14,6 +14,40 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+HOTKEY_INFO=$(python3 <<'PY'
+try:
+    import config
+    labels = list(dict.fromkeys(getattr(config, "HOTKEY_DISPLAY_LABELS", None) or [getattr(config, "HOTKEY_PRIMARY_LABEL", "Command")]))
+    hint = " / ".join(labels)
+    primary = labels[0] if labels else "Command"
+except Exception:
+    hint = "Command"
+    primary = "Command"
+print(hint)
+print(primary)
+PY
+)
+
+if [[ -n "$HOTKEY_INFO" ]]; then
+    IFS=$'\n' read -r HOTKEY_HINT HOTKEY_PRIMARY_LABEL <<< "$HOTKEY_INFO"
+fi
+
+HOTKEY_HINT="${HOTKEY_HINT:-Command}"
+HOTKEY_PRIMARY_LABEL="${HOTKEY_PRIMARY_LABEL:-$HOTKEY_HINT}"
+
+# 项目虚拟环境路径（优先使用外部传入的 UV_PROJECT_ENVIRONMENT）
+PROJECT_VENV_PATH="${UV_PROJECT_ENVIRONMENT:-.venv}"
+VENV_ACTIVATED=0
+
+if [[ -f ".venv/bin/activate" ]]; then
+    # shellcheck disable=SC1091
+    source ".venv/bin/activate"
+    PROJECT_VENV_PATH=".venv"
+    VENV_ACTIVATED=1
+    export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-$PROJECT_VENV_PATH}"
+    echo "已预加载本地虚拟环境 .venv"
+fi
+
 # 打印彩色信息
 print_info() {
     echo -e "${BLUE}ℹ️  $1${NC}"
@@ -134,38 +168,69 @@ check_permissions() {
 # 安装依赖
 install_dependencies() {
     print_info "检查并安装依赖..."
-    
+
     if command -v uv &> /dev/null; then
-        # 检查是否需要添加 google-generativeai
-        if ! python3 -c "import google.generativeai" 2>/dev/null; then
-            print_info "安装 google-generativeai..."
-            uv add google-generativeai
+        if [[ -z "$UV_PROJECT_ENVIRONMENT" ]]; then
+            export UV_PROJECT_ENVIRONMENT="$PROJECT_VENV_PATH"
+        else
+            PROJECT_VENV_PATH="$UV_PROJECT_ENVIRONMENT"
         fi
-        
-        # 确保其他依赖已安装
-        if [[ -f "pyproject.toml" ]] || [[ -f "uv.lock" ]]; then
-            print_info "同步项目依赖..."
-            uv sync
+
+        print_info "检测到 uv，使用环境: $PROJECT_VENV_PATH"
+        UV_PROJECT_ENVIRONMENT="$PROJECT_VENV_PATH" uv sync
+        print_success "uv 同步完成"
+
+        if [[ -f "$PROJECT_VENV_PATH/bin/activate" ]]; then
+            # shellcheck disable=SC1091
+            source "$PROJECT_VENV_PATH/bin/activate"
+            VENV_ACTIVATED=1
+            print_success "已切换到 UV 虚拟环境 $PROJECT_VENV_PATH"
+        else
+            print_warning "未找到 $PROJECT_VENV_PATH/bin/activate，uv 将在运行时自动管理环境"
         fi
     else
-        # 使用 pip 安装
-        if ! python3 -c "import google.generativeai" 2>/dev/null; then
-            print_info "安装 google-generativeai..."
-            python3 -m pip install google-generativeai
+        if [[ ! -f ".venv/bin/activate" ]]; then
+            print_info "创建本地虚拟环境 (.venv)..."
+            python3 -m venv .venv
         fi
-        
-        # 检查其他必要依赖
-        REQUIRED_PACKAGES=("pyperclip" "python-dotenv" "pynput" "sounddevice" "numpy")
+
+        # shellcheck disable=SC1091
+        source ".venv/bin/activate"
+        PROJECT_VENV_PATH=".venv"
+        VENV_ACTIVATED=1
+        print_success "已启用虚拟环境 .venv"
+
+        REQUIRED_PACKAGES=("google-generativeai" "pyperclip" "python-dotenv" "pynput" "sounddevice" "numpy")
         for package in "${REQUIRED_PACKAGES[@]}"; do
             if ! python3 -c "import $package" 2>/dev/null; then
                 print_info "安装 $package..."
-                python3 -m pip install $package
+                python3 -m pip install "$package"
             fi
         done
+        print_success "pip 依赖安装完成"
     fi
-    
+
     print_success "依赖检查完成"
 }
+
+activate_virtualenv() {
+    if [[ "$VENV_ACTIVATED" -eq 1 ]]; then
+        return
+    fi
+
+    if [[ -f "$PROJECT_VENV_PATH/bin/activate" ]]; then
+        # shellcheck disable=SC1091
+        source "$PROJECT_VENV_PATH/bin/activate"
+        VENV_ACTIVATED=1
+        print_success "已切换到虚拟环境 $PROJECT_VENV_PATH"
+    else
+        print_warning "未找到虚拟环境 $PROJECT_VENV_PATH，将继续使用系统 Python"
+    fi
+}
+
+export VOICE_SESSION_MODE="batch"
+export SEGMENT_ENABLE_AUTO_OUTPUT="False"
+export SEGMENT_OUTPUT_METHOD="clipboard"
 
 # 选择转录模型
 select_transcription_model() {
@@ -249,15 +314,16 @@ select_thinking_mode() {
 show_usage() {
     echo ""
     echo -e "${CYAN}📖 使用方法:${NC}"
-    echo -e "${GREEN}1. 双击 Option 键${NC} → 开始录音"
-    echo -e "${GREEN}2. 再次双击 Option 键${NC} → 停止录音并处理"
-    echo -e "${GREEN}3. Cmd+V${NC} → 在任意应用中粘贴结果"
+    echo -e "${GREEN}1. 按住 ${HOTKEY_HINT} 键${NC} → 开始录音"
+    echo -e "${GREEN}2. 松开 ${HOTKEY_PRIMARY_LABEL} 键${NC} → 停止录音并处理"
+    echo -e "${GREEN}3. 系统会自动粘贴，如需再次使用可按 Cmd+V${NC}"
     echo ""
-    echo -e "${CYAN}🌐 转录流程:${NC}"
+    echo -e "${CYAN}🌐 一口气流程:${NC}"
     echo -e "${GREEN}• 本地录音${NC} → 高质量音频采集"
-    echo -e "${GREEN}• Gemini-2.5-Flash${NC} → 云端智能转录"
+    echo -e "${GREEN}• Gemini转录${NC} → 云端智能转录并即时润色"
     echo -e "${GREEN}• 词典优化${NC} → 专业术语匹配"
-    echo -e "${GREEN}• Gemini纠错${NC} → 语法和标点优化"
+    echo -e "${GREEN}• 自动输出${NC} → 复制到剪贴板"
+    
     echo ""
     echo -e "${CYAN}🔔 通知功能:${NC}"
     echo -e "${GREEN}• 系统通知${NC} → macOS 通知中心弹窗"
@@ -269,11 +335,19 @@ show_usage() {
     echo -e "${GREEN}• dic.txt${NC} → 用户词典文件"
     echo -e "${GREEN}• .env${NC} → Gemini API 密钥配置"
     echo ""
-    echo -e "${CYAN}🆚 与 Whisper 版本的区别:${NC}"
-    echo -e "${GREEN}• 无需本地模型${NC} → 不依赖 whisper.cpp"
-    echo -e "${GREEN}• 云端处理${NC} → 更快的转录速度"
-    echo -e "${GREEN}• 更高准确度${NC} → Gemini 对中文支持更好"
-    echo -e "${GREEN}• 实时更新${NC} → 模型持续优化"
+    
+    # 显示选择的配置摘要
+    echo -e "${CYAN}📋 当前配置摘要:${NC}"
+    echo -e "${GREEN}• 工作模式:${NC} 一口气模式"
+    echo -e "${GREEN}• 输出方式:${NC} 复制到剪贴板"
+    echo -e "${GREEN}• 转录模型:${NC} ${GEMINI_TRANSCRIPTION_MODEL:-gemini-2.5-flash}"
+    if [[ "$MODEL_SUPPORTS_THINKING" == "true" ]]; then
+        echo -e "${GREEN}• 思考模式:${NC} budget=${GEMINI_THINKING_BUDGET:-0}"
+    fi
+    echo ""
+    
+    echo -e "${CYAN}🆚 模式说明:${NC}"
+    echo -e "${GREEN}• 一口气模式${NC} → 录音结束后统一输出，更稳定可靠"
     echo ""
 }
 
@@ -291,13 +365,16 @@ main() {
     # 安装依赖
     install_dependencies
     
-    # 检查权限
-    check_permissions
-    
     # 配置选择
     select_transcription_model
     select_thinking_mode
-    
+
+    # 检查权限
+    check_permissions
+
+    # 切换虚拟环境
+    activate_virtualenv
+
     # 显示使用方法
     show_usage
     
@@ -311,8 +388,13 @@ main() {
     
     # 选择运行方式
     if command -v uv &> /dev/null; then
-        print_success "使用 uv 运行 (推荐)"
-        exec uv run python main.py
+        if [[ "$VENV_ACTIVATED" -eq 1 ]]; then
+            print_success "使用虚拟环境中的 python 运行"
+            exec python main.py
+        else
+            print_success "使用 uv run 启动（自动加载环境）"
+            exec uv run python main.py
+        fi
     else
         print_success "使用 python3 运行"
         exec python3 main.py

@@ -4,11 +4,14 @@ Gemini纠错模块
 使用Gemini 2.5 Flash对转录结果进行后处理纠错
 """
 
+import hashlib
 import os
+from typing import Optional, List, Dict, Any
+
 import httpx
 from google import genai
 from google.genai import types
-from typing import Optional, List, Dict, Any
+
 import config
 
 class GeminiCorrector:
@@ -40,8 +43,9 @@ class GeminiCorrector:
                 self.client = genai.Client(api_key=self.api_key, http_options=http_options)
                 
                 print(f"✅ Gemini纠错器已就绪 ({self.model})")
-                if config.DEBUG_MODE:
-                    print(f"   API密钥: {self.api_key[:10]}...{self.api_key[-4:] if len(self.api_key) > 10 else self.api_key}")
+                if config.DEBUG_MODE and self.api_key:
+                    digest = hashlib.sha256(self.api_key.encode()).hexdigest()[:12]
+                    print(f"   API密钥指纹: {digest}")
                     
             except Exception as e:
                 print(f"❌ Gemini客户端初始化失败: {e}")

@@ -12,6 +12,7 @@ dependencies = [
     "openai-whisper>=20250625",
     "pynput>=1.8.1",
     "pyobjc-core>=11.1",
+    "pyobjc-framework-applicationservices>=11.1",
     "pyobjc-framework-avfoundation>=11.1",
     "pyobjc-framework-speech>=11.1",
     "pyperclip>=1.9.0",
