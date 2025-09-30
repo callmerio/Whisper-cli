@@ -7,6 +7,7 @@ import { getConfig, validateConfig, printConfigSummary } from './core/config';
 import { createLogger } from './utils/logger';
 import { createGeminiClient } from './services/gemini-client';
 import { createDictionaryManager } from './managers/dictionary-manager';
+import { createClipboardManager } from './managers/clipboard-manager';
 import { isErr, isOk } from './utils/result';
 import { formatError } from './utils/errors';
 
@@ -71,7 +72,12 @@ async function main(): Promise<void> {
       logger.info('✅ Gemini 健康检查通过');
     }
 
-    // 7. 测试词典功能
+    // 7. 初始化剪贴板管理器
+    logger.info('初始化剪贴板管理器...');
+    const clipboardManager = createClipboardManager();
+    logger.info('✅ 剪贴板管理器已就绪');
+
+    // 8. 测试词典功能
     if (dictionaryManager.isReady() && dictionaryManager.getStats().enabled > 0) {
       logger.info('测试词典替换功能...');
       const testText = 'TypeScript 和 JavaScript 是很流行的编程语言，Gemini 是谷歌的 API。';
@@ -84,7 +90,30 @@ async function main(): Promise<void> {
       }
     }
 
-    // 8. 系统就绪
+    // 9. 测试剪贴板功能
+    if (config.app.enableClipboard) {
+      logger.info('测试剪贴板功能...');
+      
+      const testClipboardText = '这是一段测试文本，用于验证剪贴板功能。';
+      const writeResult = await clipboardManager.write(testClipboardText);
+      
+      if (isOk(writeResult)) {
+        logger.info('✅ 剪贴板写入成功');
+        
+        const readResult = await clipboardManager.read();
+        if (isOk(readResult) && readResult.data === testClipboardText) {
+          logger.info('✅ 剪贴板读取验证成功');
+          
+          const statsResult = await clipboardManager.getStats();
+          if (isOk(statsResult)) {
+            const stats = statsResult.data;
+            logger.info(`📊 剪贴板统计: ${stats.characters} 字符, ${stats.words} 词`);
+          }
+        }
+      }
+    }
+
+    // 10. 系统就绪
     console.log('\n' + '='.repeat(60));
     console.log('✅ 系统初始化成功！');
     console.log('='.repeat(60));
@@ -95,14 +124,15 @@ async function main(): Promise<void> {
     console.log('  ✅ Gemini 客户端封装');
     console.log('  ✅ 健康检查机制');
     console.log('  ✅ 词典管理器 (智能替换)');
+    console.log('  ✅ 剪贴板管理器 (读写/备份/恢复)');
     console.log('  ✅ 文件系统适配器');
     console.log('  ✅ 文本处理工具');
 
-    console.log('\n🚧 开发中的功能:');
+    console.log('\n🚧 开发中的功能 (Phase 3):');
     console.log('  ⏳ 音频录制模块');
     console.log('  ⏳ 热键监听');
-    console.log('  ⏳ 词典管理');
-    console.log('  ⏳ 剪贴板集成');
+    console.log('  ⏳ 会话管理器');
+    console.log('  ⏳ 完整转录流程');
 
     console.log('\n💡 提示：');
     console.log('  - 使用 pnpm dev 启动开发模式');
