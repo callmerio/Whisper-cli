@@ -59,3 +59,20 @@ test_*.py
 *.sh.bak
 # @generate-docs.sh
 docs/code2prompt-output
+
+# ==================== TypeScript ====================
+
+# TypeScript 构建输出
+typescript/node_modules/
+typescript/dist/
+typescript/.turbo/
+typescript/*.tsbuildinfo
+
+# TypeScript 测试和覆盖率
+typescript/coverage/
+typescript/.nyc_output/
+
+# TypeScript 环境文件
+typescript/.env
+typescript/.env.local
+typescript/.env.*.local

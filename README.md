@@ -2,6 +2,10 @@
 
 基于 Google Gemini-2.5-Flash 的高性能中文语音转录系统，支持实时录音、提示词内联润色和剪贴板集成。
 
+> 📢 **项目重构中**: 正在开发 TypeScript 版本，提供更好的类型安全和跨平台支持！
+> - 🐍 **Python 版本**: `python/` 目录（当前稳定版本）
+> - 🚀 **TypeScript 版本**: `typescript/` 目录（开发中）
+
 ## ✨ 核心功能
 
 - 🎙️ **实时录音** - 按住 Left Option 键录音，松开自动结束（可在 `config.HOTKEY_LONG_PRESS_KEYS` 调整）
@@ -16,16 +20,20 @@
 
 ## 🚀 快速开始
 
-### 1. 环境要求
+### Python 版本（当前稳定版）
+
+#### 1. 环境要求
 
 - Python 3.8+
 - macOS (支持全局快捷键)
 - Google Gemini API 密钥
 - 音频输入设备
 
-### 2. 安装依赖
+#### 2. 安装依赖
 
 ```bash
+cd python
+
 # 使用 uv (推荐)
 uv sync
 
@@ -33,9 +41,9 @@ uv sync
 pip install google-genai python-dotenv pynput sounddevice numpy pyperclip
 ```
 
-### 3. 配置 API 密钥
+#### 3. 配置 API 密钥
 
-创建 `.env` 文件：
+在 `python/` 目录创建 `.env` 文件：
 
 ```bash
 GEMINI_API_KEY=your_gemini_api_key_here
@@ -43,11 +51,29 @@ GEMINI_API_KEY=your_gemini_api_key_here
 
 获取 API 密钥：https://aistudio.google.com/app/apikey
 
-### 4. 启动程序
+#### 4. 启动程序
 
 ```bash
+cd python
 ./start.sh
 ```
+
+### TypeScript 版本（开发中）
+
+```bash
+cd typescript
+
+# 安装依赖
+pnpm install  # 或 npm install
+
+# 开发模式
+pnpm dev
+
+# 查看详细文档
+cat README.md
+```
+
+详细重构计划：[`docs/memo/TS_REFACTOR_PLAN.md`](docs/memo/TS_REFACTOR_PLAN.md)
 
 ## 🎯 使用方法
 
@@ -76,20 +102,34 @@ GEMINI_API_KEY=your_gemini_api_key_here
 ## 📁 项目结构
 
 ```
-Gemini-Speech-to-Text/
-├── main.py                    # 主程序
-├── start.sh                   # 启动脚本
-├── config.py                  # 配置文件
-├── gemini_transcriber.py      # Gemini 转录器
-├── gemini_corrector.py        # Gemini 纠错器
-├── hotkey_listener.py         # 快捷键监听
-├── audio_recorder.py          # 音频录制
-├── dictionary_manager.py      # 词典管理
-├── notification_utils.py      # 通知工具
-├── timer_utils.py             # 计时工具
-├── dic.txt                    # 用户词典
-├── .env                       # 环境变量
-└── pyproject.toml             # 项目依赖
+Whisper-cli/
+├── python/                    # Python 版本（稳定）
+│   ├── main.py               # 主程序
+│   ├── start.sh              # 启动脚本
+│   ├── config.py             # 配置文件
+│   ├── gemini_transcriber.py # Gemini 转录器
+│   ├── gemini_corrector.py   # Gemini 纠错器
+│   ├── hotkey_listener.py    # 快捷键监听
+│   ├── audio_recorder.py     # 音频录制
+│   ├── dictionary_manager.py # 词典管理
+│   ├── notification_utils.py # 通知工具
+│   ├── dic.txt               # 用户词典
+│   └── pyproject.toml        # 项目依赖
+├── typescript/                # TypeScript 版本（开发中）
+│   ├── src/                  # 源代码
+│   │   ├── core/            # 核心业务逻辑
+│   │   ├── services/        # 外部服务
+│   │   ├── managers/        # 状态管理器
+│   │   ├── utils/           # 工具函数
+│   │   └── types/           # 类型定义
+│   ├── tests/               # 测试文件
+│   └── package.json         # 项目配置
+├── docs/                      # 文档
+│   └── memo/                 # 开发记录
+│       ├── memory-timeline.md
+│       ├── cards.md
+│       └── TS_REFACTOR_PLAN.md  # TypeScript 重构计划
+└── README.md                  # 本文件
 ```
 
 ## ⚙️ 配置说明
