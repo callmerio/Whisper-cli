@@ -6,4 +6,17 @@
 🧠 对话态模式：为批量模式加一个“上下文增强”开关，自动把 history.json 里的同一会话摘要注入给 Gemini。
 🧩 词典/纠错联动：让词典替换或纠错阶段也能访问最近片段的结果，避免多回合里术语不一致。
 
+## TypeScript 重构计划
 
+🚀 **目标**：创建 TypeScript 版本，为纯前端项目和跨平台支持做准备
+
+📁 **架构**：
+- `python/` - 现有 Python 版本（稳定维护）
+- `typescript/` - TypeScript 重构版本（新开发）
+- 详细计划见：`docs/memo/TS_REFACTOR_PLAN.md`
+
+✨ **优势**：
+- 类型安全和更好的 IDE 支持
+- 跨平台能力（Node.js）
+- 现代化工具链
+- 易于制作 Electron 桌面应用
