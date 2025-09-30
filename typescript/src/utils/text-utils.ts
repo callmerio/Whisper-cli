@@ -86,3 +86,4 @@ export function sanitizeText(text: string): string {
     .replace(/\s+/g, ' ') // 多个空格替换为单个
     .trim();
 }
+

@@ -297,3 +297,4 @@ export class DictionaryManager {
 export function createDictionaryManager(config: DictionaryConfig): DictionaryManager {
   return new DictionaryManager(config);
 }
+

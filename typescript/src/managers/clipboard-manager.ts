@@ -209,3 +209,4 @@ export function createClipboardManager(): ClipboardManager {
  * 全局剪贴板管理器实例（单例）
  */
 export const clipboardManager = createClipboardManager();
+

@@ -115,3 +115,4 @@ export async function writeJsonFile<T>(
   const content = pretty ? JSON.stringify(data, null, 2) : JSON.stringify(data);
   return writeTextFile(filePath, content);
 }
+

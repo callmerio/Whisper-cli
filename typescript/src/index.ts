@@ -8,6 +8,7 @@ import { createLogger } from './utils/logger';
 import { createGeminiClient } from './services/gemini-client';
 import { createDictionaryManager } from './managers/dictionary-manager';
 import { createClipboardManager } from './managers/clipboard-manager';
+import { createSessionManager } from './managers/session-manager';
 import { isErr, isOk } from './utils/result';
 import { formatError } from './utils/errors';
 
@@ -77,12 +78,21 @@ async function main(): Promise<void> {
     const clipboardManager = createClipboardManager();
     logger.info('✅ 剪贴板管理器已就绪');
 
+    // 7.5. 初始化会话管理器
+    logger.info('初始化会话管理器...');
+    const sessionManager = createSessionManager(
+      geminiClient,
+      dictionaryManager,
+      clipboardManager
+    );
+    logger.info('✅ 会话管理器已就绪');
+
     // 8. 测试词典功能
     if (dictionaryManager.isReady() && dictionaryManager.getStats().enabled > 0) {
       logger.info('测试词典替换功能...');
       const testText = 'TypeScript 和 JavaScript 是很流行的编程语言，Gemini 是谷歌的 API。';
       const result = dictionaryManager.applyDictionary(testText);
-      
+
       if (result.replacements.length > 0) {
         logger.info(`📝 测试文本: ${testText}`);
         logger.info(`✅ 替换后: ${result.text}`);
@@ -93,17 +103,17 @@ async function main(): Promise<void> {
     // 9. 测试剪贴板功能
     if (config.app.enableClipboard) {
       logger.info('测试剪贴板功能...');
-      
+
       const testClipboardText = '这是一段测试文本，用于验证剪贴板功能。';
       const writeResult = await clipboardManager.write(testClipboardText);
-      
+
       if (isOk(writeResult)) {
         logger.info('✅ 剪贴板写入成功');
-        
+
         const readResult = await clipboardManager.read();
         if (isOk(readResult) && readResult.data === testClipboardText) {
           logger.info('✅ 剪贴板读取验证成功');
-          
+
           const statsResult = await clipboardManager.getStats();
           if (isOk(statsResult)) {
             const stats = statsResult.data;
@@ -117,7 +127,7 @@ async function main(): Promise<void> {
     console.log('\n' + '='.repeat(60));
     console.log('✅ 系统初始化成功！');
     console.log('='.repeat(60));
-    console.log('\n📝 已完成的功能 (Phase 1-2):');
+    console.log('\n📝 已完成的功能 (Phase 1-3):');
     console.log('  ✅ 配置管理系统 (Zod 验证)');
     console.log('  ✅ 增强版日志系统');
     console.log('  ✅ Result 类型错误处理');
@@ -125,14 +135,16 @@ async function main(): Promise<void> {
     console.log('  ✅ 健康检查机制');
     console.log('  ✅ 词典管理器 (智能替换)');
     console.log('  ✅ 剪贴板管理器 (读写/备份/恢复)');
+    console.log('  ✅ 会话管理器 (批量/实时模式)');
+    console.log('  ✅ 分段处理器 (转录/词典/纠错)');
     console.log('  ✅ 文件系统适配器');
     console.log('  ✅ 文本处理工具');
 
-    console.log('\n🚧 开发中的功能 (Phase 3):');
-    console.log('  ⏳ 音频录制模块');
-    console.log('  ⏳ 热键监听');
-    console.log('  ⏳ 会话管理器');
-    console.log('  ⏳ 完整转录流程');
+    console.log('\n🚧 下一步开发 (Phase 4):');
+    console.log('  ⏳ 音频录制模块 (node-record-lpcm16 或 Web Audio API)');
+    console.log('  ⏳ 热键监听 (node-global-shortcut 或 uiohook-napi)');
+    console.log('  ⏳ VAD 语音活动检测');
+    console.log('  ⏳ 完整的音频→转录→输出流程');
 
     console.log('\n💡 提示：');
     console.log('  - 使用 pnpm dev 启动开发模式');

@@ -136,12 +136,14 @@ Note: 开始 TypeScript 版本重构，创建 monorepo 结构，完成 Phase 1�
 ### 技术成果总结
 
 **代码统计**：
+
 - TypeScript 文件：15 个
 - 总代码行数：~2000+ 行
 - 测试覆盖：CLI 工具提供交互式测试
 - 类型覆盖率：100%（严格模式）
 
 **核心模块**：
+
 1. 配置系统（Zod 验证，30+ 配置项）
 2. 日志系统（彩色输出，分级控制）
 3. Result 类型（Rust 风格错误处理）
@@ -153,6 +155,7 @@ Note: 开始 TypeScript 版本重构，创建 monorepo 结构，完成 Phase 1�
 9. 文本处理工具（Levenshtein 距离等）
 
 **Git 提交记录**：
+
 - `b54f321` 🔒 代码质量与安全性加固
 - `8a2e398` 🚀 项目重构：引入 TypeScript 版本
 - `a5343df` 📝 更新 Roadmap: 添加 TypeScript 重构计划
@@ -162,12 +165,14 @@ Note: 开始 TypeScript 版本重构，创建 monorepo 结构，完成 Phase 1�
 - `3aae194` ✨ Phase 2 完成：剪贴板管理和 CLI 工具
 
 **下一步计划（Phase 3）**：
+
 - 音频录制模块（需要 Node.js 原生模块或外部库）
 - 热键监听（macOS 平台集成）
 - 会话管理器（状态机，多模式支持）
 - 完整转录流程（端到端集成）
 
 **经验总结**：
+
 1. **类型安全是王道**：Zod Schema + TypeScript strict mode 在编译时捕获了大量潜在错误
 2. **Result 模式优雅**：比 try-catch 更清晰，强制错误处理，代码可读性高
 3. **工具链重要**：ESLint + Prettier + tsx 提供了流畅的开发体验
