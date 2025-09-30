@@ -6,7 +6,8 @@
 import { getConfig, validateConfig, printConfigSummary } from './core/config';
 import { createLogger } from './utils/logger';
 import { createGeminiClient } from './services/gemini-client';
-import { isErr } from './utils/result';
+import { createDictionaryManager } from './managers/dictionary-manager';
+import { isErr, isOk } from './utils/result';
 import { formatError } from './utils/errors';
 
 const logger = createLogger('Main');
@@ -31,11 +32,29 @@ async function main(): Promise<void> {
     // 3. 打印配置摘要
     printConfigSummary(config);
 
-    // 4. 初始化 Gemini 客户端
+    // 4. 初始化词典管理器
+    logger.info('初始化词典管理器...');
+    const dictionaryManager = createDictionaryManager(config.dictionary);
+    const loadResult = await dictionaryManager.load();
+
+    if (isOk(loadResult)) {
+      const count = loadResult.data;
+      if (count > 0) {
+        logger.info(`✅ 词典加载成功: ${count} 个条目`);
+        const stats = dictionaryManager.getStats();
+        logger.debug(`启用: ${stats.enabled}, 平均权重: ${(stats.averageWeight * 100).toFixed(1)}%`);
+      } else {
+        logger.info('词典文件为空或不存在');
+      }
+    } else {
+      logger.warn('词典加载失败:', formatError(loadResult.error));
+    }
+
+    // 5. 初始化 Gemini 客户端
     logger.info('初始化 Gemini 客户端...');
     const geminiClient = createGeminiClient(config.gemini);
 
-    // 5. 健康检查
+    // 6. 健康检查
     if (process.env.SKIP_HEALTH_CHECK === 'true') {
       logger.warn('⏭️  跳过健康检查（SKIP_HEALTH_CHECK=true）');
     } else {
@@ -52,16 +71,32 @@ async function main(): Promise<void> {
       logger.info('✅ Gemini 健康检查通过');
     }
 
-    // 6. 系统就绪
+    // 7. 测试词典功能
+    if (dictionaryManager.isReady() && dictionaryManager.getStats().enabled > 0) {
+      logger.info('测试词典替换功能...');
+      const testText = 'TypeScript 和 JavaScript 是很流行的编程语言，Gemini 是谷歌的 API。';
+      const result = dictionaryManager.applyDictionary(testText);
+      
+      if (result.replacements.length > 0) {
+        logger.info(`📝 测试文本: ${testText}`);
+        logger.info(`✅ 替换后: ${result.text}`);
+        logger.info(`🔄 执行了 ${result.replacements.length} 处替换`);
+      }
+    }
+
+    // 8. 系统就绪
     console.log('\n' + '='.repeat(60));
     console.log('✅ 系统初始化成功！');
     console.log('='.repeat(60));
-    console.log('\n📝 已完成的功能:');
+    console.log('\n📝 已完成的功能 (Phase 1-2):');
     console.log('  ✅ 配置管理系统 (Zod 验证)');
     console.log('  ✅ 增强版日志系统');
     console.log('  ✅ Result 类型错误处理');
     console.log('  ✅ Gemini 客户端封装');
     console.log('  ✅ 健康检查机制');
+    console.log('  ✅ 词典管理器 (智能替换)');
+    console.log('  ✅ 文件系统适配器');
+    console.log('  ✅ 文本处理工具');
 
     console.log('\n🚧 开发中的功能:');
     console.log('  ⏳ 音频录制模块');

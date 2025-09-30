@@ -51,6 +51,7 @@ DEBUG_MODE=true
 如果你使用本地 proxy 或自建网关，有两种方式：
 
 **方式 1: 环境变量代理（推荐）**
+
 ```bash
 export HTTP_PROXY=http://localhost:3001
 export HTTPS_PROXY=http://localhost:3001
@@ -58,6 +59,7 @@ pnpm dev
 ```
 
 **方式 2: 使用 proxy-agent**
+
 ```bash
 # 安装 proxy agent
 pnpm add https-proxy-agent
@@ -105,18 +107,21 @@ typescript/
 ## 🎯 已完成功能（Phase 1）
 
 ### ✅ 基础设施
+
 - [x] 项目初始化和配置
 - [x] TypeScript 严格模式
 - [x] ESLint + Prettier
 - [x] 开发工具链（tsup + tsx）
 
 ### ✅ 核心系统
+
 - [x] 配置管理系统（Zod 验证）
 - [x] 增强版日志系统（彩色、分级）
 - [x] Result 类型错误处理
 - [x] 自定义错误体系
 
 ### ✅ Gemini 服务
+
 - [x] Gemini 客户端封装
 - [x] 音频转录（带重试）
 - [x] 文本纠错
@@ -185,6 +190,7 @@ if (isOk(result)) {
 ## 🔧 配置项说明
 
 ### Gemini 配置
+
 - `GEMINI_API_KEY` - API 密钥（必需）
 - `GEMINI_MODEL` - 模型名称（默认: gemini-2.5-flash）
 - `GEMINI_BASE_URL` - 自定义 API 端点（可选）
@@ -192,10 +198,12 @@ if (isOk(result)) {
 - `GEMINI_MAX_RETRIES` - 最大重试次数（默认: 2）
 
 ### 热键配置
+
 - `HOTKEY_KEY` - 热键名称（默认: left_option）
 - `HOTKEY_THRESHOLD` - 长按阈值（默认: 0.03s）
 
 ### 音频配置
+
 - `AUDIO_SAMPLE_RATE` - 采样率（默认: 16000Hz）
 - `AUDIO_CHANNELS` - 声道数（默认: 1）
 
@@ -206,6 +214,7 @@ if (isOk(result)) {
 **问题**: `fetch failed` 或 `ECONNREFUSED`
 
 **解决方案**:
+
 - 检查 API 密钥是否正确
 - 确认网络连接正常
 - 如果使用 proxy，确保 proxy 正在运行
@@ -216,6 +225,7 @@ if (isOk(result)) {
 **问题**: `配置验证失败`
 
 **解决方案**:
+
 - 检查 `.env` 文件是否存在
 - 确认所有必需的配置项都已设置
 - 查看错误提示中的具体字段
@@ -225,6 +235,7 @@ if (isOk(result)) {
 **问题**: `Cannot find module`
 
 **解决方案**:
+
 ```bash
 rm -rf node_modules pnpm-lock.yaml
 pnpm install

@@ -27,6 +27,7 @@ NODE_OPTIONS="--import ./proxy-setup.js" pnpm dev
 ```
 
 创建 `proxy-setup.js`：
+
 ```javascript
 import { setGlobalDispatcher, ProxyAgent } from 'undici';
 
