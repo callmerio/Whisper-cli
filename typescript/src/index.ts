@@ -36,15 +36,21 @@ async function main(): Promise<void> {
     const geminiClient = createGeminiClient(config.gemini);
 
     // 5. 健康检查
-    logger.info('执行 Gemini 健康检查...');
-    const healthResult = await geminiClient.checkHealth();
+    if (process.env.SKIP_HEALTH_CHECK === 'true') {
+      logger.warn('⏭️  跳过健康检查（SKIP_HEALTH_CHECK=true）');
+    } else {
+      logger.info('执行 Gemini 健康检查...');
+      const healthResult = await geminiClient.checkHealth();
 
-    if (isErr(healthResult)) {
-      logger.error('Gemini 健康检查失败:', formatError(healthResult.error));
-      process.exit(1);
+      if (isErr(healthResult)) {
+        logger.error('Gemini 健康检查失败:', formatError(healthResult.error));
+        logger.warn('💡 提示: 如果使用代理，可以设置 SKIP_HEALTH_CHECK=true 跳过健康检查');
+        logger.warn('💡 或查看 PROXY_GUIDE.md 了解代理配置方法');
+        process.exit(1);
+      }
+
+      logger.info('✅ Gemini 健康检查通过');
     }
-
-    logger.info('✅ Gemini 健康检查通过');
 
     // 6. 系统就绪
     console.log('\n' + '='.repeat(60));

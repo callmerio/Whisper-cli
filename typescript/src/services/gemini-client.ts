@@ -3,6 +3,7 @@
  */
 
 import { GoogleGenerativeAI, GenerativeModel, GenerateContentResult } from '@google/generative-ai';
+import { createHash } from 'crypto';
 import type { GeminiConfig } from '../core/config';
 import { createLogger } from '../utils/logger';
 import { Result, ok, err, fromPromise } from '../utils/result';
@@ -53,8 +54,23 @@ export class GeminiClient {
       throw new GeminiError('Gemini API Key 未配置');
     }
 
-    // 初始化 Gemini AI
-    this.ai = new GoogleGenerativeAI(config.apiKey);
+    // 初始化 Gemini AI（支持自定义 baseUrl）
+    const aiConfig: { apiKey: string; baseUrl?: string } = { apiKey: config.apiKey };
+    
+    if (config.baseUrl) {
+      aiConfig.baseUrl = config.baseUrl;
+      logger.info(`使用自定义 Base URL: ${config.baseUrl}`);
+    }
+
+    this.ai = new GoogleGenerativeAI(aiConfig.apiKey);
+    
+    // 注意: Google Generative AI SDK 可能不支持自定义 baseUrl
+    // 如果你使用的是自定义 proxy，可能需要设置环境变量或使用其他方法
+    if (config.baseUrl) {
+      logger.warn('注意: @google/generative-ai SDK 可能不支持自定义 baseUrl');
+      logger.warn('建议使用环境变量 HTTPS_PROXY 或其他 HTTP 代理方式');
+    }
+    
     this.model = this.ai.getGenerativeModel({ model: config.model });
 
     this.isReady = true;
@@ -70,8 +86,7 @@ export class GeminiClient {
    * 生成 API 密钥的 SHA256 指纹
    */
   private hashApiKey(apiKey: string): string {
-    const crypto = require('crypto');
-    return crypto.createHash('sha256').update(apiKey).digest('hex').substring(0, 12);
+    return createHash('sha256').update(apiKey).digest('hex').substring(0, 12);
   }
 
   /**
