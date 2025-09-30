@@ -3,6 +3,7 @@
 基于 Google Gemini-2.5-Flash 的高性能中文语音转录系统，支持实时录音、提示词内联润色和剪贴板集成。
 
 > 📢 **项目重构中**: 正在开发 TypeScript 版本，提供更好的类型安全和跨平台支持！
+>
 > - 🐍 **Python 版本**: `python/` 目录（当前稳定版本）
 > - 🚀 **TypeScript 版本**: `typescript/` 目录（开发中）
 
@@ -49,7 +50,7 @@ pip install google-genai python-dotenv pynput sounddevice numpy pyperclip
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
-获取 API 密钥：https://aistudio.google.com/app/apikey
+获取 API 密钥：<https://aistudio.google.com/app/apikey>
 
 #### 4. 启动程序
 
@@ -78,6 +79,7 @@ cat README.md
 ## 🎯 使用方法
 
 ### 基础操作
+
 1. 运行 `./start.sh` 启动系统
 2. 在启动时选择转录模型和思考模式
 3. 按住 **Left Option 键** 开始录音
@@ -85,14 +87,17 @@ cat README.md
 5. 系统自动转录并粘贴到光标位置，同时备份剪贴板
 
 ### 模型选择
+
 启动时可选择三种模式：
 
 **📋 转录模型选择:**
+
 - **Gemini 2.5 Pro** - 最高精度，功能最全面
 - **Gemini 2.5 Flash (推荐)** - 平衡性能和精度  
 - **Gemini 2.5 Flash Lite** - 最快速度，无思考模式
 
 **🧠 思考模式选择:**
+
 - **快速模式 (推荐)** - 无思考，响应快速
 - **平衡模式** - 适度思考，平衡速度和精度
 - **精确模式** - 深度思考，最高精度
@@ -160,16 +165,19 @@ API:25.0%
 ## 🔧 高级功能
 
 ### 错误处理与重试
+
 - 自动检测网络错误并重试
 - 智能识别 API 超时和服务故障
 - 最大重试 3 次，间隔 2 秒
 
 ### 性能监控
+
 - 详细的处理时间统计
 - 分步计时：录音、转录、纠错、词典处理
 - 调试模式显示完整性能分析
 
 ### 通知系统
+
 - **系统通知**: macOS 通知中心弹窗
 - **声音反馈**: 不同操作播放对应音效  
 - **视觉提示**: 控制台状态显示
@@ -215,6 +223,7 @@ API:25.0%
 ### 调试模式
 
 设置 `DEBUG_MODE = True` 查看详细日志：
+
 - API 调用详情
 - 音频文件信息  
 - 性能统计数据

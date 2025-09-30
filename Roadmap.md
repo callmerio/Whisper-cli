@@ -11,11 +11,13 @@
 🚀 **目标**：创建 TypeScript 版本，为纯前端项目和跨平台支持做准备
 
 📁 **架构**：
+
 - `python/` - 现有 Python 版本（稳定维护）
 - `typescript/` - TypeScript 重构版本（新开发）
 - 详细计划见：`docs/memo/TS_REFACTOR_PLAN.md`
 
 ✨ **优势**：
+
 - 类型安全和更好的 IDE 支持
 - 跨平台能力（Node.js）
 - 现代化工具链
