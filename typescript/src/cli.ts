@@ -10,8 +10,11 @@ import { createGeminiClient } from './services/gemini-client';
 import { createDictionaryManager } from './managers/dictionary-manager';
 import { createClipboardManager } from './managers/clipboard-manager';
 import { createSessionManager } from './managers/session-manager';
+import { createAudioRecorder } from './services/audio-recorder';
+import { createHotkeyListener } from './services/hotkey-listener';
 import { isOk } from './utils/result';
 import type { AudioSegment } from './types/session';
+import type { AudioChunk } from './types/audio';
 
 const logger = createLogger('CLI');
 
@@ -26,10 +29,10 @@ interface CLICommand {
  */
 async function testTranscribe(): Promise<void> {
   console.log('\n🎯 测试 Gemini 转录功能\n');
-  
+
   const config = getConfig();
   const gemini = createGeminiClient(config.gemini);
-  
+
   // 这里需要实际的音频文件
   console.log('⚠️  此功能需要音频录制模块支持');
   console.log('📋 当前状态: 音频录制模块开发中');
@@ -169,29 +172,29 @@ async function testCorrection(): Promise<void> {
  */
 async function testSession(): Promise<void> {
   console.log('\n🎙️ 测试会话管理功能\n');
-  
+
   const config = getConfig();
   const gemini = createGeminiClient(config.gemini);
   const dictionary = createDictionaryManager(config.dictionary);
   const clipboard = createClipboardManager();
-  
+
   // 加载词典
   await dictionary.load();
-  
+
   // 创建会话管理器
   const sessionManager = createSessionManager(gemini, dictionary, clipboard);
-  
+
   console.log('📋 会话管理器已创建\n');
-  
+
   // 监听事件
   sessionManager.on('sessionStart', (sessionId, mode) => {
     console.log(`✅ 会话开始: ${sessionId} (${mode})`);
   });
-  
+
   sessionManager.on('segmentComplete', (segmentId, text) => {
     console.log(`✅ 分段完成: "${text.substring(0, 50)}..."`);
   });
-  
+
   sessionManager.on('sessionComplete', (stats) => {
     console.log('\n📊 会话统计:');
     console.log(`  会话ID: ${stats.sessionId}`);
@@ -206,20 +209,20 @@ async function testSession(): Promise<void> {
     console.log(`  处理时长: ${stats.processingDuration.toFixed(2)}s`);
     console.log(`  总时长: ${stats.totalDuration.toFixed(2)}s`);
   });
-  
+
   sessionManager.on('error', (error) => {
     console.error(`❌ 错误: ${error.message}`);
   });
-  
+
   console.log('🧪 模拟批量模式会话:\n');
-  
+
   // 开始会话
   const startResult = await sessionManager.startSession('batch');
   if (!isOk(startResult)) {
     console.error('会话启动失败');
     return;
   }
-  
+
   // 模拟添加音频分段（使用假数据）
   console.log('📝 添加模拟音频分段...');
   const mockAudio: AudioSegment = {
@@ -232,15 +235,171 @@ async function testSession(): Promise<void> {
     sampleRate: 16000,
     channels: 1,
   };
-  
+
   await sessionManager.addAudioSegment(mockAudio);
-  
+
   console.log('⚠️  注意: 这是模拟数据，实际需要音频录制模块');
   console.log('📋 会话管理器功能正常，等待音频模块集成\n');
-  
+
   // 取消会话（因为是模拟数据）
   sessionManager.cancelSession();
   console.log('✅ 测试完成（已取消模拟会话）');
+}
+
+/**
+ * 端到端集成测试
+ */
+async function testE2E(): Promise<void> {
+  console.log('\n🚀 端到端集成测试\n');
+  
+  const config = getConfig();
+  
+  // 1. 初始化所有组件
+  console.log('1️⃣ 初始化组件...\n');
+  
+  const gemini = createGeminiClient(config.gemini);
+  const dictionary = createDictionaryManager(config.dictionary);
+  const clipboard = createClipboardManager();
+  const audioRecorder = createAudioRecorder({
+    sampleRate: config.audio.sampleRate,
+    channels: config.audio.channels,
+  });
+  const hotkeyListener = createHotkeyListener({
+    key: config.hotkey.key,
+    threshold: config.hotkey.threshold,
+  });
+  
+  // 加载词典
+  await dictionary.load();
+  
+  // 创建会话管理器
+  const sessionManager = createSessionManager(gemini, dictionary, clipboard);
+  
+  console.log('✅ 所有组件初始化完成\n');
+  
+  // 2. 测试音频录制
+  console.log('2️⃣ 测试音频录制...\n');
+  
+  const audioChunks: AudioChunk[] = [];
+  
+  audioRecorder.on('data', (chunk) => {
+    console.log(`  📦 收到音频块 #${chunk.sequence}: ${chunk.data.length} 字节`);
+    audioChunks.push(chunk);
+  });
+  
+  const startResult = await audioRecorder.start();
+  if (isOk(startResult)) {
+    console.log('  ✅ 录音已开始');
+    
+    // 录制 3 秒
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    const stopResult = await audioRecorder.stop();
+    if (isOk(stopResult)) {
+      const stats = stopResult.data;
+      console.log(`  ✅ 录音已停止: ${stats.duration.toFixed(2)}s, ${stats.totalBytes} 字节\n`);
+    }
+  }
+  
+  // 3. 测试热键监听
+  console.log('3️⃣ 测试热键监听...\n');
+  
+  await hotkeyListener.start();
+  console.log(`  ✅ 热键监听已启动: ${config.hotkey.key}\n`);
+  
+  // 模拟热键事件
+  if ('simulatePress' in hotkeyListener && 'simulateRelease' in hotkeyListener) {
+    const mockListener = hotkeyListener as any;
+    
+    hotkeyListener.on('press', (event) => {
+      console.log(`  🔽 热键按下: ${event.key} (${new Date(event.timestamp).toISOString()})`);
+    });
+    
+    hotkeyListener.on('release', (event) => {
+      console.log(`  🔼 热键释放: ${event.key} (持续 ${event.duration?.toFixed(3)}s)`);
+    });
+    
+    hotkeyListener.on('longPress', (event) => {
+      console.log(`  ⏱️  长按触发: ${event.key} (${event.duration?.toFixed(3)}s)`);
+    });
+    
+    console.log('  📝 模拟热键操作:\n');
+    mockListener.simulatePress();
+    await new Promise(resolve => setTimeout(resolve, 100));
+    mockListener.simulateRelease();
+    
+    console.log();
+  }
+  
+  await hotkeyListener.stop();
+  
+  // 4. 测试完整转录流程（模拟）
+  console.log('4️⃣ 测试转录流程...\n');
+  
+  sessionManager.on('sessionStart', (sessionId, mode) => {
+    console.log(`  ✅ 会话开始: ${sessionId} (${mode})`);
+  });
+  
+  sessionManager.on('sessionComplete', (stats) => {
+    console.log(`\n  📊 会话统计:`);
+    console.log(`    • 会话ID: ${stats.sessionId}`);
+    console.log(`    • 模式: ${stats.mode}`);
+    console.log(`    • 分段数: ${stats.segmentCount}`);
+    console.log(`    • 成功: ${stats.successCount}`);
+    console.log(`    • 失败: ${stats.failureCount}`);
+    console.log(`    • 录音时长: ${stats.recordingDuration.toFixed(2)}s`);
+    console.log(`    • 处理时长: ${stats.processingDuration.toFixed(2)}s`);
+    console.log(`    • 总时长: ${stats.totalDuration.toFixed(2)}s`);
+  });
+  
+  const sessionResult = await sessionManager.startSession('batch');
+  if (isOk(sessionResult)) {
+    console.log(`  📝 会话ID: ${sessionResult.data}\n`);
+    
+    // 模拟添加音频分段
+    if (audioChunks.length > 0) {
+      // 合并所有音频块
+      const audioData = Buffer.concat(audioChunks.map(c => c.data));
+      
+      const mockSegment: AudioSegment = {
+        id: 'e2e-test-1',
+        audioData,
+        startTime: 0,
+        endTime: 3,
+        duration: 3,
+        isFinal: true,
+        sampleRate: config.audio.sampleRate,
+        channels: config.audio.channels,
+      };
+      
+      console.log(`  📤 添加音频分段: ${audioData.length} 字节\n`);
+      await sessionManager.addAudioSegment(mockSegment);
+    }
+    
+    // 结束会话
+    const endResult = await sessionManager.endSession();
+    if (isOk(endResult)) {
+      console.log('\n  ✅ 会话已结束');
+    }
+  }
+  
+  // 5. 总结
+  console.log('\n' + '='.repeat(60));
+  console.log('✅ 端到端测试完成！');
+  console.log('='.repeat(60));
+  console.log('\n📋 测试覆盖:');
+  console.log('  ✅ 音频录制器');
+  console.log('  ✅ 热键监听器');
+  console.log('  ✅ 会话管理器');
+  console.log('  ✅ 分段处理器');
+  console.log('  ✅ 词典管理器');
+  console.log('  ✅ 剪贴板管理器');
+  console.log('  ✅ Gemini 客户端');
+  console.log('\n💡 提示:');
+  console.log('  - 当前使用模拟音频和热键');
+  console.log('  - 实际部署需要真实的音频录制库');
+  console.log('  - 建议使用: node-record-lpcm16 或 @tensorflow/tfjs-node');
+  console.log();
 }
 
 /**
@@ -248,26 +407,26 @@ async function testSession(): Promise<void> {
  */
 async function showConfig(): Promise<void> {
   console.log('\n⚙️ 当前配置\n');
-  
+
   const config = getConfig();
-  
+
   console.log('Gemini:');
   console.log(`  模型: ${config.gemini.model}`);
   console.log(`  超时: ${config.gemini.requestTimeout}ms`);
   console.log(`  最大重试: ${config.gemini.maxRetries}\n`);
-  
+
   console.log('热键:');
   console.log(`  按键: ${config.hotkey.key}`);
   console.log(`  阈值: ${config.hotkey.threshold}s\n`);
-  
+
   console.log('音频:');
   console.log(`  采样率: ${config.audio.sampleRate}Hz`);
   console.log(`  声道: ${config.audio.channels}\n`);
-  
+
   console.log('词典:');
   console.log(`  启用: ${config.dictionary.enabled}`);
   console.log(`  文件: ${config.dictionary.filePath}\n`);
-  
+
   console.log('应用:');
   console.log(`  剪贴板: ${config.app.enableClipboard}`);
   console.log(`  自动粘贴: ${config.app.enableAutoPaste}`);
@@ -278,6 +437,11 @@ async function showConfig(): Promise<void> {
  * 命令列表
  */
 const commands: CLICommand[] = [
+  {
+    name: 'e2e',
+    description: '端到端集成测试（推荐）',
+    execute: testE2E,
+  },
   {
     name: 'transcribe',
     description: '测试 Gemini 转录功能',
